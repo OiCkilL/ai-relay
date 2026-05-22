@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import TokenTrendChart from './TokenTrendChart';
 
 interface ProviderInfo {
@@ -31,10 +32,13 @@ interface AdminData {
     daily: { used: number; limit: number | string };
     monthly: { used: number; limit: number | string };
     allowed: boolean;
+    isOverride: boolean;
   };
   config: {
     dailyLimit: number | null;
     monthlyLimit: number | null;
+    customDailyLimit?: number | null;
+    customMonthlyLimit?: number | null;
   };
 }
 
@@ -47,6 +51,8 @@ interface OverviewTabProps {
   operationLoading: boolean;
   onTestKey: (providerId: string, hash: string) => Promise<void>;
   onDeleteKey: (providerId: string, hash: string) => Promise<void>;
+  onSaveQuota: (dailyLimit: number | null, monthlyLimit: number | null) => Promise<void>;
+  onResetQuota: () => Promise<void>;
 }
 
 export default function OverviewTab({
@@ -58,7 +64,20 @@ export default function OverviewTab({
   operationLoading,
   onTestKey,
   onDeleteKey,
+  onSaveQuota,
+  onResetQuota,
 }: OverviewTabProps) {
+  const [showConfig, setShowConfig] = useState(false);
+  const [dailyInput, setDailyInput] = useState('');
+  const [monthlyInput, setMonthlyInput] = useState('');
+
+  useEffect(() => {
+    const currentDaily = data.quota.isOverride ? (data.config.customDailyLimit ?? 0) : (data.config.dailyLimit ?? 0);
+    const currentMonthly = data.quota.isOverride ? (data.config.customMonthlyLimit ?? 0) : (data.config.monthlyLimit ?? 0);
+    setDailyInput(currentDaily ? String(currentDaily) : '');
+    setMonthlyInput(currentMonthly ? String(currentMonthly) : '');
+  }, [data]);
+
   const fmtNum = (n: number) => n.toLocaleString();
   const fmtTokens = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -93,15 +112,123 @@ export default function OverviewTab({
             </div>
           </div>
         </div>
-        <div style={{
-          marginTop: '1.25rem', padding: '0.4rem 0.8rem', borderRadius: '6px',
-          display: 'inline-block', fontSize: '0.85rem', fontWeight: 500,
-          backgroundColor: data.quota.allowed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-          color: data.quota.allowed ? '#34d399' : '#fca5a5',
-          border: data.quota.allowed ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)',
-        }}>
-          {data.quota.allowed ? t.withinLimits : t.rateLimited}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{
+            padding: '0.4rem 0.8rem', borderRadius: '6px',
+            display: 'inline-block', fontSize: '0.85rem', fontWeight: 500,
+            backgroundColor: data.quota.allowed ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            color: data.quota.allowed ? '#34d399' : '#fca5a5',
+            border: data.quota.allowed ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(239, 68, 68, 0.2)',
+          }}>
+            {data.quota.allowed ? t.withinLimits : t.rateLimited}
+          </div>
+          <button
+            onClick={() => setShowConfig(!showConfig)}
+            style={{
+              padding: '0.4rem 0.8rem', borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              backgroundColor: showConfig ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+              color: '#d1d5db', cursor: 'pointer', fontSize: '0.85rem',
+              transition: 'all 0.2s', fontWeight: 500
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={(e) => { if (!showConfig) { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#d1d5db'; } }}
+          >
+            {t.quotaConfigureBtn}
+          </button>
         </div>
+
+        {showConfig && (
+          <div style={{
+            marginTop: '1.25rem', padding: '1.25rem', borderRadius: '12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.15)', border: '1px solid rgba(255, 255, 255, 0.05)',
+            display: 'flex', flexDirection: 'column', gap: '1rem',
+          }}>
+            <h3 style={{ fontSize: '1rem', color: '#fff', margin: 0, fontWeight: 600 }}>
+              {t.quotaConfigureTitle}
+            </h3>
+            
+            {/* Warning Message */}
+            <div style={{
+              fontSize: '0.8rem', padding: '0.6rem 0.8rem', borderRadius: '6px',
+              lineHeight: 1.4,
+              backgroundColor: data.quota.isOverride ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+              color: data.quota.isOverride ? '#fbbf24' : '#60a5fa',
+              border: data.quota.isOverride ? '1px solid rgba(245, 158, 11, 0.15)' : '1px solid rgba(59, 130, 246, 0.15)'
+            }}>
+              {data.quota.isOverride ? t.kvQuotaWarningManaged : t.kvQuotaWarningEnv}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{t.dailyLimitLabel}</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={dailyInput}
+                  onChange={(e) => setDailyInput(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem', borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(0, 0, 0, 0.2)', color: '#fff',
+                    outline: 'none', fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{t.monthlyLimitLabel}</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={monthlyInput}
+                  onChange={(e) => setMonthlyInput(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem', borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: 'rgba(0, 0, 0, 0.2)', color: '#fff',
+                    outline: 'none', fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  const daily = dailyInput === '' ? 0 : parseInt(dailyInput, 10);
+                  const monthly = monthlyInput === '' ? 0 : parseInt(monthlyInput, 10);
+                  onSaveQuota(daily || null, monthly || null);
+                }}
+                disabled={operationLoading}
+                style={{
+                  padding: '0.5rem 1rem', borderRadius: '6px', border: 'none',
+                  backgroundColor: '#2563eb', color: '#fff', fontSize: '0.85rem', fontWeight: 600,
+                  cursor: operationLoading ? 'not-allowed' : 'pointer', opacity: operationLoading ? 0.6 : 1,
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => { if (!operationLoading) e.currentTarget.style.backgroundColor = '#1d4ed8'; }}
+                onMouseLeave={(e) => { if (!operationLoading) e.currentTarget.style.backgroundColor = '#2563eb'; }}
+              >
+                {t.btnSaveQuota}
+              </button>
+
+              {data.quota.isOverride && (
+                <button
+                  onClick={onResetQuota}
+                  disabled={operationLoading}
+                  style={{
+                    padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)', color: '#f87171', fontSize: '0.85rem', fontWeight: 600,
+                    cursor: operationLoading ? 'not-allowed' : 'pointer', opacity: operationLoading ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => { if (!operationLoading) { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)'; } }}
+                  onMouseLeave={(e) => { if (!operationLoading) { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.05)'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)'; } }}
+                >
+                  {t.btnResetQuota}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Today's Usage */}

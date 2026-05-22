@@ -35,10 +35,13 @@ interface AdminData {
     daily: { used: number; limit: number | string };
     monthly: { used: number; limit: number | string };
     allowed: boolean;
+    isOverride: boolean;
   };
   config: {
     dailyLimit: number | null;
     monthlyLimit: number | null;
+    customDailyLimit?: number | null;
+    customMonthlyLimit?: number | null;
   };
 }
 
@@ -69,6 +72,19 @@ const TRANSLATIONS = {
     monthlyRequests: '当月已用请求次数',
     withinLimits: '✅ 正常运行中',
     rateLimited: '🚫 已触发限额限流',
+    quotaConfigureBtn: '⚙️ 配置限额',
+    quotaConfigureTitle: '⚙️ 配置全局请求限额',
+    dailyLimitLabel: '日请求上限 (0 为无限制):',
+    monthlyLimitLabel: '月请求上限 (0 为无限制):',
+    btnSaveQuota: '保存限额',
+    btnResetQuota: '重置为默认',
+    kvQuotaWarningManaged: '⚠️ KV 限额已激活：自定义全局限额已在 KV 中启用，覆盖了环境变量配置。',
+    kvQuotaWarningEnv: '💡 当前正在使用本地环境变量中定义的限额。在下方设置将存入 KV 并覆盖默认配置。',
+    msgQuotaSaved: '全局限额配置保存成功',
+    msgQuotaReset: '全局限额配置已成功重置为默认值',
+    confirmResetQuota: '您确定要重置限额配置为环境变量默认值吗？',
+    alertSaveQuotaFailed: '保存限额配置失败',
+    alertResetQuotaFailed: '重置限额配置失败',
 
     // Today's Usage
     todaysUsage: '📈 今日消耗概览',
@@ -189,6 +205,19 @@ const TRANSLATIONS = {
     monthlyRequests: 'Monthly Requests',
     withinLimits: '✅ Within limits',
     rateLimited: '🚫 Rate limited',
+    quotaConfigureBtn: '⚙️ Configure Limits',
+    quotaConfigureTitle: '⚙️ Configure Global Quota Limits',
+    dailyLimitLabel: 'Daily Limit (0 for unlimited):',
+    monthlyLimitLabel: 'Monthly Limit (0 for unlimited):',
+    btnSaveQuota: 'Save Limits',
+    btnResetQuota: 'Reset to Default',
+    kvQuotaWarningManaged: '⚠️ KV quota active: Custom limits are stored in KV and override environment variables.',
+    kvQuotaWarningEnv: '💡 Currently using quota limits defined in environment variables. Setting limits below will save them in KV.',
+    msgQuotaSaved: 'Global quota limits saved successfully',
+    msgQuotaReset: 'Global quota limits reset to defaults successfully',
+    confirmResetQuota: 'Are you sure you want to reset quota limits to environment variable defaults?',
+    alertSaveQuotaFailed: 'Failed to save quota limits',
+    alertResetQuotaFailed: 'Failed to reset quota limits',
 
     // Today's Usage
     todaysUsage: "📈 Today's Usage",
@@ -609,6 +638,53 @@ export default function AdminPage() {
     }
   };
 
+  const handleSaveQuota = async (dailyLimit: number | null, monthlyLimit: number | null) => {
+    setOperationLoading(true);
+    try {
+      const res = await fetch('/api/admin/quota', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ dailyLimit, monthlyLimit }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error?.message || 'Failed to save quota limits');
+      }
+      alert(t.msgQuotaSaved);
+      await fetchData(); // refresh global data
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t.alertSaveQuotaFailed);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  const handleResetQuota = async () => {
+    if (!confirm(t.confirmResetQuota)) return;
+    setOperationLoading(true);
+    try {
+      const res = await fetch('/api/admin/quota', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error?.message || 'Failed to reset quota limits');
+      }
+      alert(t.msgQuotaReset);
+      await fetchData(); // refresh global data
+    } catch (e) {
+      alert(e instanceof Error ? e.message : t.alertResetQuotaFailed);
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (authenticated) {
       const interval = setInterval(fetchData, 15000);
@@ -767,11 +843,7 @@ export default function AdminPage() {
           display: inline-block;
         }
         .content-area {
-          transition: opacity 0.3s ease;
-        }
-        .content-loading {
-          opacity: 0.65;
-          pointer-events: none;
+          /* Page content container */
         }
       `}} />
 
@@ -848,8 +920,8 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* Page Body with loading feedback */}
-      <div className={`content-area ${loading ? 'content-loading' : ''}`}>
+      {/* Page Body */}
+      <div className="content-area">
         {activeTab === 'overview' && (
           <OverviewTab
             data={data!}
@@ -860,6 +932,8 @@ export default function AdminPage() {
             operationLoading={operationLoading}
             onTestKey={handleTestKeyGeneral}
             onDeleteKey={handleDeleteKeyGeneral}
+            onSaveQuota={handleSaveQuota}
+            onResetQuota={handleResetQuota}
           />
         )}
         {activeTab === 'keys' && (

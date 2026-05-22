@@ -119,4 +119,5 @@ export interface QuotaStatus {
   monthlyUsed: number;
   monthlyLimit: number;
   retryAfter?: number;
+  isOverride?: boolean;
 }

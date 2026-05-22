@@ -29,10 +29,13 @@ interface AdminData {
     daily: { used: number; limit: number | string };
     monthly: { used: number; limit: number | string };
     allowed: boolean;
+    isOverride: boolean;
   };
   config: {
     dailyLimit: number | null;
     monthlyLimit: number | null;
+    customDailyLimit?: number | null;
+    customMonthlyLimit?: number | null;
   };
 }
 

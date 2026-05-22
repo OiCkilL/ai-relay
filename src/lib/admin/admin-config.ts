@@ -31,6 +31,7 @@ async function getKV() {
 const PREFIX = {
   fallbacks: 'admin:fallbacks:',   // admin:fallbacks:{provider} → JSON string[]
   keys: 'admin:keys:',             // admin:keys:{provider} → JSON string[] (raw API keys)
+  quota: 'admin:quota',            // admin:quota → Hash { dailyLimit, monthlyLimit }
 } as const;
 
 /**
@@ -244,4 +245,61 @@ export async function removeManagedKey(
   }
   await setManagedKeys(providerName, filtered);
   return filtered;
+}
+
+// ── Quota Limit Override Management ─────────────────────────
+
+export interface CustomQuotaConfig {
+  dailyLimit: number | null;
+  monthlyLimit: number | null;
+}
+
+/**
+ * Get custom quota override limits from KV.
+ * Returns null if no custom quota override is configured.
+ */
+export async function getCustomQuota(): Promise<CustomQuotaConfig | null> {
+  try {
+    const kv = await getKV();
+    if (kv) {
+      const raw = await withTimeout<Record<string, unknown> | null>(
+        kv.hgetall(PREFIX.quota),
+        1000,
+        null,
+        'getCustomQuota'
+      );
+      if (raw && (raw.dailyLimit !== undefined || raw.monthlyLimit !== undefined)) {
+        return {
+          dailyLimit: raw.dailyLimit !== null && raw.dailyLimit !== undefined && raw.dailyLimit !== '' ? parseInt(String(raw.dailyLimit), 10) : null,
+          monthlyLimit: raw.monthlyLimit !== null && raw.monthlyLimit !== undefined && raw.monthlyLimit !== '' ? parseInt(String(raw.monthlyLimit), 10) : null,
+        };
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+/**
+ * Set custom quota override limits in KV.
+ */
+export async function setCustomQuota(quota: CustomQuotaConfig): Promise<void> {
+  const kv = await getKV();
+  if (!kv) {
+    throw new Error('KV storage not configured — cannot persist quota overrides');
+  }
+  await kv.hset(PREFIX.quota, {
+    dailyLimit: quota.dailyLimit === null ? '' : String(quota.dailyLimit),
+    monthlyLimit: quota.monthlyLimit === null ? '' : String(quota.monthlyLimit),
+  });
+}
+
+/**
+ * Clear custom quota overrides and revert to environment variables.
+ */
+export async function clearCustomQuota(): Promise<void> {
+  const kv = await getKV();
+  if (!kv) return;
+  await kv.del(PREFIX.quota);
 }

@@ -534,12 +534,26 @@ export class KVUsageStorage implements UsageStorage {
     const cached = getCached<QuotaStatus>(cacheKey);
     if (cached) return cached;
 
-    const dailyLimit = parseInt(process.env.RELAY_DAILY_LIMIT || '0', 10) || 0;
-    const monthlyLimit = parseInt(process.env.RELAY_MONTHLY_LIMIT || '0', 10) || 0;
+    let dailyLimit = parseInt(process.env.RELAY_DAILY_LIMIT || '0', 10) || 0;
+    let monthlyLimit = parseInt(process.env.RELAY_MONTHLY_LIMIT || '0', 10) || 0;
+    let isOverride = false;
+
+    try {
+      const { getCustomQuota } = await import('@/lib/admin/admin-config');
+      const customQuota = await getCustomQuota();
+      if (customQuota) {
+        dailyLimit = customQuota.dailyLimit || 0;
+        monthlyLimit = customQuota.monthlyLimit || 0;
+        isOverride = true;
+      }
+    } catch {
+      // Ignore config loading errors, fall back to env variables
+    }
+
     const kv = await getKV();
 
     if (!kv || (!dailyLimit && !monthlyLimit)) {
-      return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit };
+      return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit, isOverride };
     }
 
     const date = today();
@@ -562,14 +576,14 @@ export class KVUsageStorage implements UsageStorage {
         const midnight = new Date(now);
         midnight.setUTCHours(24, 0, 0, 0);
         const retryAfter = Math.ceil((midnight.getTime() - now.getTime()) / 1000);
-        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
+        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter, isOverride };
       } else if (monthlyLimit > 0 && monthlyUsed >= monthlyLimit) {
         const now = new Date();
         const nextMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
         const retryAfter = Math.ceil((nextMonth.getTime() - now.getTime()) / 1000);
-        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter };
+        result = { allowed: false, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, retryAfter, isOverride };
       } else {
-        result = { allowed: true, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit };
+        result = { allowed: true, dailyUsed, dailyLimit, monthlyUsed, monthlyLimit, isOverride };
       }
 
       // Only cache "allowed" results to avoid stale blocks
@@ -578,7 +592,7 @@ export class KVUsageStorage implements UsageStorage {
       }
       return result;
     } catch {
-      return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit };
+      return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit, isOverride };
     }
   }
 

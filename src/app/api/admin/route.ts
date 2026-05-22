@@ -84,10 +84,13 @@ export async function GET(request: NextRequest) {
       daily: { used: quota.dailyUsed, limit: quota.dailyLimit || 'unlimited' },
       monthly: { used: quota.monthlyUsed, limit: quota.monthlyLimit || 'unlimited' },
       allowed: quota.allowed,
+      isOverride: quota.isOverride || false,
     },
     config: {
       dailyLimit: parseInt(process.env.RELAY_DAILY_LIMIT || '0', 10) || null,
       monthlyLimit: parseInt(process.env.RELAY_MONTHLY_LIMIT || '0', 10) || null,
+      customDailyLimit: quota.isOverride ? quota.dailyLimit : null,
+      customMonthlyLimit: quota.isOverride ? quota.monthlyLimit : null,
     },
   });
 }
