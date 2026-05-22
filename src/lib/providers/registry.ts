@@ -83,6 +83,11 @@ export const PROVIDERS: Record<string, ProviderConfig> = {
     headerFormat: 'openai',
     envKeyField: 'XIAOMI_KEYS',
     envBaseUrlField: 'XIAOMI_BASE_URL',
+    modelMapping: {
+      'mimo-v2.5-pro-coding': 'mimo-v2.5-pro',
+      'mimo-v2.5-pro-sgp': 'mimo-v2.5-pro',
+      'mimo-v2.5-flash-sgp': 'mimo-v2.5-flash',
+    },
     models: [
       { id: 'mimo-v2.5-pro', displayName: 'MiMo v2.5 Pro', contextWindow: 128000, maxOutput: 16384, supportsStream: true, supportsTools: true },
     ],

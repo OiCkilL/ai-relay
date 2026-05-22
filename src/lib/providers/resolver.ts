@@ -34,14 +34,20 @@ export function resolveModelAlias(model: string): string {
 export function resolveProvider(model: string): ProviderConfig | null {
   const resolved = resolveModelAlias(model);
   const lowerModel = resolved.toLowerCase();
+  let bestProvider: ProviderConfig | null = null;
+  let longestPrefixLength = 0;
+
   for (const provider of Object.values(PROVIDERS)) {
     for (const prefix of provider.modelPrefixes) {
       if (lowerModel.startsWith(prefix)) {
-        return provider;
+        if (prefix.length > longestPrefixLength) {
+          longestPrefixLength = prefix.length;
+          bestProvider = provider;
+        }
       }
     }
   }
-  return null;
+  return bestProvider;
 }
 
 /**
