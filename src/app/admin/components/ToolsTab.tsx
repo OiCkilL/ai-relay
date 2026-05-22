@@ -46,16 +46,27 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
     });
   }, [providers]);
 
-  // Set default model once models are loaded
+  // Set default model once models are loaded, or if the current selection becomes invalid
   useEffect(() => {
-    if (testableModels.length > 0 && !selectedModel) {
-      setSelectedModel(testableModels[0].modelId);
+    if (testableModels.length > 0) {
+      const isValid = testableModels.some((m) => `${m.providerId}:${m.modelId}` === selectedModel);
+      if (!selectedModel || !isValid) {
+        const defaultVal = `${testableModels[0].providerId}:${testableModels[0].modelId}`;
+        setSelectedModel(defaultVal);
+      }
     }
   }, [testableModels, selectedModel]);
 
   // Find currently selected model object
   const currentModelObj = useMemo(() => {
-    return testableModels.find((m) => m.modelId === selectedModel);
+    if (!selectedModel) return undefined;
+    const colonIdx = selectedModel.indexOf(':');
+    if (colonIdx === -1) {
+      return testableModels.find((m) => m.modelId === selectedModel);
+    }
+    const providerId = selectedModel.substring(0, colonIdx);
+    const modelId = selectedModel.substring(colonIdx + 1);
+    return testableModels.find((m) => m.providerId === providerId && m.modelId === modelId);
   }, [testableModels, selectedModel]);
 
   // Fetch keys for the current provider
@@ -106,7 +117,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
     setTestResult(null);
 
     try {
-      const payload: any = { model: selectedModel };
+      const payload: any = { model: currentModelObj.modelId };
       if (useCustomKey) {
         if (customKey.trim()) {
           payload.key = customKey.trim();
@@ -484,7 +495,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
                   const prefix = hasKey ? '🟢 ' : '⚠️ ';
                   const suffix = hasKey ? '' : (lang === 'zh' ? ' (未配置密钥)' : ' (No Keys)');
                   return (
-                    <option key={`${m.providerId}:${m.modelId}`} value={m.modelId}>
+                    <option key={`${m.providerId}:${m.modelId}`} value={`${m.providerId}:${m.modelId}`}>
                       {prefix}[{m.providerName}] {m.displayName} ({m.modelId}){suffix}
                     </option>
                   );
