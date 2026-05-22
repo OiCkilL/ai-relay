@@ -7,7 +7,8 @@ import { getKeyPoolStats, getRelayApiKeys, initAllKeyPools } from '@/lib/relay';
 import { KVUsageStorage } from '@/lib/usage';
 import { PROVIDERS } from '@/lib/providers';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
+export const maxDuration = 30;
 
 const usageStorage = new KVUsageStorage();
 
