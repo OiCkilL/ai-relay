@@ -117,10 +117,14 @@ const TRANSLATIONS = {
     keySourceEnv: '环境变量',
     keySourceKv: 'KV 存储',
     btnDeleteKey: '删除',
-    deleteEnvKeyTitle: '环境变量中的密钥必须在 .env.local 中修改/删除',
+    deleteEnvKeyTitle: '删除此密钥（删除后其他环境变量密钥将自动转存为 KV 托管）',
     deleteKvKeyTitle: '删除此密钥',
     noKeysConfigured: '未配置任何 API 密钥，对此服务商的请求将失败。',
     confirmDeleteKey: '您确定要删除此 API 密钥吗？',
+    btnTestKey: '🧪 测试',
+    btnTestingKey: '测试中...',
+    btnTestSuccess: '验证成功',
+    btnTestFailed: '验证失败',
 
     // Fallback Chain
     fallbackChainTitle: '🔗 故障转移（回退）链',
@@ -216,10 +220,14 @@ const TRANSLATIONS = {
     keySourceEnv: 'env',
     keySourceKv: 'kv',
     btnDeleteKey: 'Delete',
-    deleteEnvKeyTitle: 'Environment keys must be deleted from .env.local file',
+    deleteEnvKeyTitle: 'Remove key (remaining environment keys will be migrated to KV)',
     deleteKvKeyTitle: 'Remove key',
     noKeysConfigured: 'No API keys configured. Requests will fail.',
     confirmDeleteKey: 'Are you sure you want to delete this API Key?',
+    btnTestKey: '🧪 Test',
+    btnTestingKey: 'Testing...',
+    btnTestSuccess: 'Success',
+    btnTestFailed: 'Failed',
 
     // Fallback Chain
     fallbackChainTitle: '🔗 Fallback Chain',
@@ -255,6 +263,8 @@ export default function AdminPage() {
   const [newKeyInput, setNewKeyInput] = useState('');
   const [operationLoading, setOperationLoading] = useState(false);
   const [configMessage, setConfigMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [testingHash, setTestingHash] = useState<string | null>(null);
+  const [testingInput, setTestingInput] = useState<boolean>(false);
   const [activeFallbacks, setActiveFallbacks] = useState<string[]>([]);
   const [selectedFallbackToAdd, setSelectedFallbackToAdd] = useState('');
 
@@ -425,15 +435,13 @@ export default function AdminPage() {
       setOperationLoading(false);
     }
   };
-
-  const handleDeleteKey = async (hash: string) => {
-    if (!selectedProvider) return;
+  const handleDeleteKeyGeneral = async (providerId: string, hash: string) => {
     const confirmMsg = t.confirmDeleteKey;
     if (!confirm(confirmMsg)) return;
     setOperationLoading(true);
     setConfigMessage(null);
     try {
-      const res = await fetch(`/api/admin/providers/${selectedProvider}/keys`, {
+      const res = await fetch(`/api/admin/providers/${providerId}/keys`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -445,13 +453,76 @@ export default function AdminPage() {
       if (!res.ok) {
         throw new Error(resData.error?.message || 'Failed to delete key');
       }
+
+      if (selectedProvider === providerId) {
+        await fetchProviderConfig(providerId);
+      }
+
+      await fetchData();
       setConfigMessage({ text: t.msgKeyDeleted, type: 'success' });
-      await fetchProviderConfig(selectedProvider);
-      await fetchData(); // refresh global key counts
     } catch (e) {
-      setConfigMessage({ text: e instanceof Error ? e.message : (lang === 'zh' ? '删除密钥失败' : 'Failed to delete key'), type: 'error' });
+      const errMsg = e instanceof Error ? e.message : (lang === 'zh' ? '删除密钥失败' : 'Failed to delete key');
+      setConfigMessage({ text: errMsg, type: 'error' });
+      alert(errMsg);
     } finally {
       setOperationLoading(false);
+    }
+  };
+
+  const handleTestKeyGeneral = async (providerId: string, hash: string) => {
+    setTestingHash(hash);
+    try {
+      const res = await fetch(`/api/admin/providers/${providerId}/keys/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ hash }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error?.message || 'Verification request failed');
+      }
+      if (resData.valid) {
+        alert(lang === 'zh' ? '✅ 验证成功：API Key 有效！' : '✅ Verification success: API Key is valid!');
+      } else {
+        const details = resData.error ? `: ${resData.error}` : '';
+        alert(`${lang === 'zh' ? '❌ 验证失败：API Key 无效' : '❌ Verification failed: API Key is invalid'}${details} (Status: ${resData.status || 'unknown'})`);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : (lang === 'zh' ? '测试失败' : 'Failed to test key'));
+    } finally {
+      setTestingHash(null);
+    }
+  };
+
+  const handleTestInputKey = async () => {
+    if (!selectedProvider || !newKeyInput.trim()) return;
+    setTestingInput(true);
+    try {
+      const res = await fetch(`/api/admin/providers/${selectedProvider}/keys/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ key: newKeyInput.trim() }),
+      });
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error?.message || 'Verification request failed');
+      }
+      if (resData.valid) {
+        alert(lang === 'zh' ? '✅ 验证成功：API Key 有效！' : '✅ Verification success: API Key is valid!');
+      } else {
+        const details = resData.error ? `: ${resData.error}` : '';
+        alert(`${lang === 'zh' ? '❌ 验证失败：API Key 无效' : '❌ Verification failed: API Key is invalid'}${details} (Status: ${resData.status || 'unknown'})`);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : (lang === 'zh' ? '测试失败' : 'Failed to test key'));
+    } finally {
+      setTestingInput(false);
     }
   };
 
@@ -779,22 +850,58 @@ export default function AdminPage() {
                 </div>
                 {/* Per-key breakdown */}
                 {p.keyErrors && p.keyErrors.length > 0 && (
-                  <div style={{ marginLeft: '1rem', fontSize: '0.8rem', color: '#666' }}>
+                  <div style={{ marginLeft: '1rem', fontSize: '0.8rem', color: '#666', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     {p.keyErrors.map((ke) => (
-                      <div key={ke.keyHash} style={{ marginBottom: '0.3rem' }}>
-                        <span style={{ fontFamily: 'monospace', color: '#888' }}>
+                      <div key={ke.keyHash} style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: 'monospace', color: '#e0e0e0', backgroundColor: '#18181b', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #27272a' }}>
                           key:{ke.keyHash.slice(0, 8)}
                         </span>
-                        {Object.entries(ke.errors).map(([code, detail]) => (
-                          <span key={code} style={{ marginLeft: '0.8rem' }}>
-                            <span style={{ color: '#f87171' }}>{code}×{detail.count}</span>
-                            {detail.reason && (
-                              <span style={{ color: '#555', marginLeft: '0.3rem' }}>
-                                — {detail.reason}
-                              </span>
-                            )}
-                          </span>
-                        ))}
+                        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                          {Object.entries(ke.errors).map(([code, detail]) => (
+                            <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                              <span style={{ color: '#f87171' }}>HTTP {code}×{detail.count}</span>
+                              {detail.reason && (
+                                <span style={{ color: '#666' }}>
+                                  ({detail.reason})
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            onClick={() => handleTestKeyGeneral(p.id, ke.keyHash)}
+                            disabled={operationLoading || testingHash !== null}
+                            style={{
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              border: '1px solid #3b82f6',
+                              backgroundColor: 'transparent',
+                              color: '#60a5fa',
+                              fontSize: '0.7rem',
+                              cursor: operationLoading || testingHash !== null ? 'not-allowed' : 'pointer',
+                              opacity: operationLoading || testingHash !== null ? 0.6 : 1,
+                            }}
+                          >
+                            {testingHash === ke.keyHash ? t.btnTestingKey : t.btnTestKey}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteKeyGeneral(p.id, ke.keyHash)}
+                            disabled={operationLoading}
+                            style={{
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              border: '1px solid #dc2626',
+                              backgroundColor: 'transparent',
+                              color: '#ef4444',
+                              fontSize: '0.7rem',
+                              cursor: operationLoading ? 'not-allowed' : 'pointer',
+                              opacity: operationLoading ? 0.6 : 1,
+                            }}
+                          >
+                            {t.btnDeleteKey}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1166,6 +1273,23 @@ export default function AdminPage() {
                     }}
                   />
                   <button
+                    onClick={handleTestInputKey}
+                    disabled={operationLoading || testingInput || !newKeyInput.trim()}
+                    style={{
+                      padding: '0.6rem 1rem',
+                      borderRadius: '6px',
+                      border: '1px solid #3b82f6',
+                      backgroundColor: 'transparent',
+                      color: '#60a5fa',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem',
+                      cursor: operationLoading || testingInput || !newKeyInput.trim() ? 'not-allowed' : 'pointer',
+                      opacity: operationLoading || testingInput || !newKeyInput.trim() ? 0.6 : 1,
+                    }}
+                  >
+                    {testingInput ? t.btnTestingKey : t.btnTestKey}
+                  </button>
+                  <button
                     onClick={handleAddKey}
                     disabled={operationLoading || !newKeyInput.trim()}
                     style={{
@@ -1228,8 +1352,25 @@ export default function AdminPage() {
                             </span>
 
                             <button
-                              onClick={() => handleDeleteKey(key.hash)}
-                              disabled={operationLoading || isEnv}
+                              onClick={() => handleTestKeyGeneral(selectedProvider!, key.hash)}
+                              disabled={operationLoading || testingHash !== null}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid #3b82f6',
+                                backgroundColor: 'transparent',
+                                color: '#60a5fa',
+                                fontSize: '0.75rem',
+                                cursor: operationLoading || testingHash !== null ? 'not-allowed' : 'pointer',
+                                opacity: operationLoading || testingHash !== null ? 0.6 : 1,
+                              }}
+                            >
+                              {testingHash === key.hash ? t.btnTestingKey : t.btnTestKey}
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteKeyGeneral(selectedProvider!, key.hash)}
+                              disabled={operationLoading}
                               style={{
                                 padding: '0.25rem 0.5rem',
                                 borderRadius: '4px',
@@ -1237,8 +1378,8 @@ export default function AdminPage() {
                                 backgroundColor: 'transparent',
                                 color: '#ef4444',
                                 fontSize: '0.75rem',
-                                cursor: operationLoading || isEnv ? 'not-allowed' : 'pointer',
-                                opacity: isEnv ? 0.4 : 1,
+                                cursor: operationLoading ? 'not-allowed' : 'pointer',
+                                opacity: operationLoading ? 0.6 : 1,
                               }}
                               title={isEnv ? t.deleteEnvKeyTitle : t.deleteKvKeyTitle}
                             >

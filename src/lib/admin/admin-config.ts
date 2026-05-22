@@ -228,18 +228,18 @@ export async function addManagedKey(
 /**
  * Remove a key from a provider's managed key list.
  * Key can be matched by full value or by hash prefix.
+ * If no managed keys exist, bootstraps from env keys first.
  */
 export async function removeManagedKey(
   providerName: string,
-  keyOrHash: string
+  keyOrHash: string,
+  envKeys: string[] = []
 ): Promise<string[]> {
   const existing = await getManagedKeys(providerName);
-  if (!existing) {
-    throw new Error(`No managed keys for provider: ${providerName}`);
-  }
+  const current = existing ?? [...envKeys];
   // Try matching by full value first, then by hash
-  const filtered = existing.filter((k) => k !== keyOrHash);
-  if (filtered.length === existing.length) {
+  const filtered = current.filter((k) => k !== keyOrHash);
+  if (filtered.length === current.length) {
     throw new Error(`Key not found: ${keyOrHash}`);
   }
   await setManagedKeys(providerName, filtered);

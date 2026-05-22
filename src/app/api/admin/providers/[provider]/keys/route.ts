@@ -154,16 +154,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   }
 
   try {
+    const envKeys = (process.env[config.envKeyField] || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+
     // If hash is provided, we need to find the actual key first
     if (body.hash && !body.key) {
       const managed = await getManagedKeys(provider);
-      if (!managed) {
-        return Response.json(
-          { error: { message: `No managed keys for provider: ${provider}`, code: 404 } },
-          { status: 404 }
-        );
-      }
-      const match = managed.find((k) => hashKey(k) === body.hash);
+      const currentKeys = managed ?? envKeys;
+      const match = currentKeys.find((k) => hashKey(k) === body.hash);
       if (!match) {
         return Response.json(
           { error: { message: `No key with hash ${body.hash}`, code: 404 } },
@@ -173,7 +173,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       body.key = match;
     }
 
-    const remaining = await removeManagedKey(provider, body.key!);
+    const remaining = await removeManagedKey(provider, body.key!, envKeys);
 
     return Response.json({
       provider,
