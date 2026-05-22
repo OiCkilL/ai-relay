@@ -20,7 +20,9 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
   const [copied, setCopied] = useState<boolean>(false);
 
   // Model & Key Connectivity Test States
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [customModelId, setCustomModelId] = useState<string>('');
   const [useCustomKey, setUseCustomKey] = useState<boolean>(false);
   const [customKey, setCustomKey] = useState<string>('');
   const [testLoading, setTestLoading] = useState<boolean>(false);
@@ -33,41 +35,48 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
   const [savingKey, setSavingKey] = useState<boolean>(false);
   const [deletingKey, setDeletingKey] = useState<boolean>(false);
 
-  // Extract all models from configured providers (NO keyCount > 0 filter anymore)
-  const testableModels = useMemo(() => {
-    return providers.flatMap((p) => {
-      return (p.models || []).map((m: any) => ({
-        modelId: m.id,
-        displayName: m.displayName,
-        providerId: p.id,
-        providerName: p.name,
-        keyCount: p.keyCount || 0,
-      }));
-    });
-  }, [providers]);
+  const currentProvider = useMemo(() => {
+    return providers.find((p) => p.id === selectedProviderId);
+  }, [providers, selectedProviderId]);
 
-  // Set default model once models are loaded, or if the current selection becomes invalid
+  const currentProviderModels = useMemo(() => {
+    return currentProvider?.models || [];
+  }, [currentProvider]);
+
+  const activeModelId = selectedModelId === '__custom__' ? customModelId.trim() : selectedModelId;
+
+  // Set default provider and model once providers are loaded
   useEffect(() => {
-    if (testableModels.length > 0) {
-      const isValid = testableModels.some((m) => `${m.providerId}:${m.modelId}` === selectedModel);
-      if (!selectedModel || !isValid) {
-        const defaultVal = `${testableModels[0].providerId}:${testableModels[0].modelId}`;
-        setSelectedModel(defaultVal);
+    if (providers.length > 0) {
+      if (!selectedProviderId || !providers.some((p) => p.id === selectedProviderId)) {
+        const defaultProvider = providers[0];
+        setSelectedProviderId(defaultProvider.id);
+        
+        const models = defaultProvider.models || [];
+        if (models.length > 0) {
+          setSelectedModelId(models[0].id);
+        } else {
+          setSelectedModelId('__custom__');
+        }
       }
     }
-  }, [testableModels, selectedModel]);
+  }, [providers, selectedProviderId]);
 
-  // Find currently selected model object
-  const currentModelObj = useMemo(() => {
-    if (!selectedModel) return undefined;
-    const colonIdx = selectedModel.indexOf(':');
-    if (colonIdx === -1) {
-      return testableModels.find((m) => m.modelId === selectedModel);
+  // Adjust selectedModelId when selectedProviderId changes
+  useEffect(() => {
+    if (selectedProviderId) {
+      const provider = providers.find((p) => p.id === selectedProviderId);
+      const models = provider?.models || [];
+      if (models.length > 0) {
+        const hasModel = models.some((m: any) => m.id === selectedModelId);
+        if (!hasModel && selectedModelId !== '__custom__') {
+          setSelectedModelId(models[0].id);
+        }
+      } else {
+        setSelectedModelId('__custom__');
+      }
     }
-    const providerId = selectedModel.substring(0, colonIdx);
-    const modelId = selectedModel.substring(colonIdx + 1);
-    return testableModels.find((m) => m.providerId === providerId && m.modelId === modelId);
-  }, [testableModels, selectedModel]);
+  }, [selectedProviderId, providers]);
 
   // Fetch keys for the current provider
   const fetchKeys = async (providerId: string) => {
@@ -102,22 +111,22 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
 
   // Fetch keys when selected provider changes
   useEffect(() => {
-    if (currentModelObj?.providerId) {
-      fetchKeys(currentModelObj.providerId);
+    if (selectedProviderId) {
+      fetchKeys(selectedProviderId);
     } else {
       setProviderKeys([]);
       setSelectedKeyHash('');
     }
-  }, [currentModelObj?.providerId]);
+  }, [selectedProviderId]);
 
   const handleRunTest = async () => {
-    if (!selectedModel || !currentModelObj) return;
+    if (!selectedProviderId || !activeModelId) return;
 
     setTestLoading(true);
     setTestResult(null);
 
     try {
-      const payload: any = { model: currentModelObj.modelId };
+      const payload: any = { model: activeModelId };
       if (useCustomKey) {
         if (customKey.trim()) {
           payload.key = customKey.trim();
@@ -126,7 +135,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
         payload.hash = selectedKeyHash;
       }
 
-      const res = await fetch(`/api/admin/providers/${currentModelObj.providerId}/keys/test`, {
+      const res = await fetch(`/api/admin/providers/${selectedProviderId}/keys/test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,10 +172,10 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
   };
 
   const handleSaveKeyToProvider = async () => {
-    if (!currentModelObj || !customKey.trim()) return;
+    if (!selectedProviderId || !customKey.trim()) return;
     setSavingKey(true);
     try {
-      const res = await fetch(`/api/admin/providers/${currentModelObj.providerId}/keys`, {
+      const res = await fetch(`/api/admin/providers/${selectedProviderId}/keys`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +194,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
       
       // Refresh global state & reload current provider keys
       if (onRefreshData) await onRefreshData();
-      await fetchKeys(currentModelObj.providerId);
+      await fetchKeys(selectedProviderId);
     } catch (e: any) {
       alert(e.message || t.alertAddFromTestFailed);
     } finally {
@@ -215,12 +224,12 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
 
   const handleDeleteKeyFromTest = async () => {
     const hashToDelete = existingKeyHashForDelete;
-    if (!currentModelObj || !hashToDelete) return;
+    if (!selectedProviderId || !hashToDelete) return;
     if (!confirm(t.confirmDeleteFailedKey)) return;
     
     setDeletingKey(true);
     try {
-      const res = await fetch(`/api/admin/providers/${currentModelObj.providerId}/keys`, {
+      const res = await fetch(`/api/admin/providers/${selectedProviderId}/keys`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -240,7 +249,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
       
       // Refresh global state & reload current provider keys
       if (onRefreshData) await onRefreshData();
-      await fetchKeys(currentModelObj.providerId);
+      await fetchKeys(selectedProviderId);
     } catch (e: any) {
       alert(e.message || t.alertDeleteFromTestFailed);
     } finally {
@@ -287,7 +296,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isNoKeysWarning = !useCustomKey && currentModelObj && currentModelObj.keyCount === 0;
+  const isNoKeysWarning = !useCustomKey && currentProvider && (currentProvider.keyCount ?? 0) === 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -451,7 +460,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
           {t.testToolDesc}
         </p>
 
-        {testableModels.length === 0 ? (
+        {providers.length === 0 ? (
           <div style={{
             padding: '1rem',
             borderRadius: '8px',
@@ -464,43 +473,107 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Model Selection */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ color: '#d1d5db', fontSize: '0.9rem', fontWeight: 500 }}>
-                {t.testModelLabel}
-              </label>
-              <select
-                value={selectedModel}
-                onChange={(e) => {
-                  setSelectedModel(e.target.value);
-                  setTestResult(null);
-                }}
-                disabled={testLoading}
-                className="custom-select"
-                style={{
-                  width: '100%',
-                  maxWidth: '500px',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {testableModels.map((m) => {
-                  const hasKey = m.keyCount > 0;
-                  const prefix = hasKey ? '🟢 ' : '⚠️ ';
-                  const suffix = hasKey ? '' : (lang === 'zh' ? ' (未配置密钥)' : ' (No Keys)');
-                  return (
-                    <option key={`${m.providerId}:${m.modelId}`} value={`${m.providerId}:${m.modelId}`}>
-                      {prefix}[{m.providerName}] {m.displayName} ({m.modelId}){suffix}
+            {/* Provider and Model Selection Row */}
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', maxWidth: '800px' }}>
+              {/* Provider Selection */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: '1 1 250px' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.9rem', fontWeight: 500 }}>
+                  {lang === 'zh' ? '选择服务商' : 'Select Provider'}
+                </label>
+                <select
+                  value={selectedProviderId}
+                  onChange={(e) => {
+                    setSelectedProviderId(e.target.value);
+                    setTestResult(null);
+                  }}
+                  disabled={testLoading}
+                  className="custom-select"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {providers.map((p) => {
+                    const hasKey = (p.keyCount || 0) > 0;
+                    const prefix = hasKey ? '🟢 ' : '⚠️ ';
+                    const suffix = hasKey ? '' : (lang === 'zh' ? ' (未配置密钥)' : ' (No Keys)');
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {prefix}{p.name} ({p.id}){suffix}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Model Selection */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: '2 1 400px' }}>
+                <label style={{ color: '#d1d5db', fontSize: '0.9rem', fontWeight: 500 }}>
+                  {t.testModelLabel}
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <select
+                    value={selectedModelId}
+                    onChange={(e) => {
+                      setSelectedModelId(e.target.value);
+                      setTestResult(null);
+                    }}
+                    disabled={testLoading}
+                    className="custom-select"
+                    style={{
+                      flex: '1 1 200px',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {currentProviderModels.map((m: any) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName || m.id}
+                      </option>
+                    ))}
+                    <option value="__custom__">
+                      {lang === 'zh' ? '✏️ 自定义模型 ID...' : '✏️ Custom Model ID...'}
                     </option>
-                  );
-                })}
-              </select>
+                  </select>
+
+                  {selectedModelId === '__custom__' && (
+                    <input
+                      type="text"
+                      placeholder={lang === 'zh' ? '输入模型 ID，如 gpt-4o' : 'Enter model ID, e.g. gpt-4o'}
+                      value={customModelId}
+                      onChange={(e) => {
+                        setCustomModelId(e.target.value);
+                        setTestResult(null);
+                      }}
+                      disabled={testLoading}
+                      style={{
+                        flex: '1 1 200px',
+                        padding: '0.5rem 1rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                        color: '#fff',
+                        fontSize: '0.9rem',
+                        outline: 'none',
+                        transition: 'all 0.2s',
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Custom Key Toggle */}
@@ -551,7 +624,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
                       }}
                     />
                   ) : (
-                    currentModelObj && currentModelObj.keyCount > 0 ? (
+                    currentProvider && currentProvider.keyCount > 0 ? (
                       <select
                         value={selectedKeyHash}
                         onChange={(e) => {
@@ -596,7 +669,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
                 {/* Run Test Button */}
                 <button
                   onClick={handleRunTest}
-                  disabled={testLoading || !selectedModel || isNoKeysWarning || (useCustomKey && !customKey.trim())}
+                  disabled={testLoading || !selectedProviderId || !activeModelId || isNoKeysWarning || (useCustomKey && !customKey.trim())}
                   style={{
                     padding: '0.5rem 1rem',
                     borderRadius: '6px',
@@ -606,7 +679,7 @@ export default function ToolsTab({ apiKey, lang, t, providers, onRefreshData }: 
                     fontWeight: 'bold',
                     fontSize: '0.9rem',
                     cursor: (testLoading || isNoKeysWarning) ? 'not-allowed' : 'pointer',
-                    opacity: (testLoading || !selectedModel || isNoKeysWarning || (useCustomKey && !customKey.trim())) ? 0.5 : 1,
+                    opacity: (testLoading || !selectedProviderId || !activeModelId || isNoKeysWarning || (useCustomKey && !customKey.trim())) ? 0.5 : 1,
                     transition: 'all 0.2s',
                     whiteSpace: 'nowrap',
                   }}

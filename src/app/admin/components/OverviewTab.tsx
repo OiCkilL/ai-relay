@@ -49,7 +49,7 @@ interface OverviewTabProps {
   t: any;
   testingHash: string | null;
   operationLoading: boolean;
-  onTestKey: (providerId: string, hash: string) => Promise<void>;
+  onTestKey: (providerId: string, hash: string, modelId?: string) => Promise<void>;
   onDeleteKey: (providerId: string, hash: string) => Promise<void>;
   onSaveQuota: (dailyLimit: number | null, monthlyLimit: number | null) => Promise<void>;
   onResetQuota: () => Promise<void>;
@@ -95,6 +95,7 @@ export default function OverviewTab({
   const [showConfig, setShowConfig] = useState(false);
   const [dailyInput, setDailyInput] = useState('');
   const [monthlyInput, setMonthlyInput] = useState('');
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const currentDaily = data.quota.isOverride ? (data.config.customDailyLimit ?? 0) : (data.config.dailyLimit ?? 0);
@@ -365,8 +366,35 @@ export default function OverviewTab({
                           key:{ke.keyHash.slice(0, 8)}
                         </span>
                         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <select
+                            value={selectedModels[ke.keyHash] || ''}
+                            onChange={(e) => setSelectedModels(prev => ({ ...prev, [ke.keyHash]: e.target.value }))}
+                            disabled={operationLoading || testingHash !== null}
+                            style={{
+                              padding: '0.15rem 1.8rem 0.15rem 0.4rem',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                              color: '#d1d5db',
+                              fontSize: '0.75rem',
+                              outline: 'none',
+                              cursor: 'pointer',
+                              appearance: 'none',
+                              backgroundImage: `url("data:image/svg+xml;utf8,<svg fill='none' height='12' stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><polyline points='6 9 12 15 18 9'/></svg>")`,
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'right 0.4rem center',
+                              backgroundSize: '0.6rem',
+                            }}
+                          >
+                            <option value="">{lang === 'zh' ? '自动 (默认)' : 'Auto (Default)'}</option>
+                            {(p.models || []).map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.displayName || m.id}
+                              </option>
+                            ))}
+                          </select>
                           <button
-                            onClick={() => onTestKey(p.id, ke.keyHash)}
+                            onClick={() => onTestKey(p.id, ke.keyHash, selectedModels[ke.keyHash])}
                             disabled={operationLoading || testingHash !== null}
                             style={{
                               padding: '0.2rem 0.5rem',

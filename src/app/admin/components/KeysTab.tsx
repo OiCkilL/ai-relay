@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 interface ProviderInfo {
   name: string;
   id: string;
@@ -66,7 +68,7 @@ interface KeysTabProps {
   setSelectedFallbackToAdd: (val: string) => void;
   onAddKey: () => Promise<void>;
   onDeleteKey: (providerId: string, hash: string) => Promise<void>;
-  onTestKey: (providerId: string, hash: string) => Promise<void>;
+  onTestKey: (providerId: string, hash: string, modelId?: string) => Promise<void>;
   onTestInputKey: () => Promise<void>;
   onSaveFallbacks: (newChain: string[]) => Promise<void>;
   onResetFallbacks: () => Promise<void>;
@@ -98,6 +100,7 @@ export default function KeysTab({
   onSaveFallbacks,
   onResetFallbacks,
 }: KeysTabProps) {
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -401,60 +404,91 @@ export default function KeysTab({
                   maxHeight: '280px',
                   overflowY: 'auto',
                 }}>
-                  {providerKeys && providerKeys.length > 0 ? (
-                    providerKeys.map((key) => {
-                      const isEnv = key.source === 'env';
-                      return (
-                        <div
-                          key={key.hash}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '0.75rem 0.8rem',
-                            borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                            <code style={{ fontSize: '0.85rem', color: '#e5e7eb', fontFamily: 'monospace' }}>
-                              {key.masked}
-                            </code>
-                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                              {t.keyHashLabel} <code style={{ fontFamily: 'monospace', color: '#d1d5db' }}>{key.hash.slice(0, 8)}</code>
-                            </span>
-                          </div>
+                  {(() => {
+                    const providerObj = data.providers.find(p => p.id === selectedProvider);
+                    const models = providerObj?.models || [];
+                    return providerKeys && providerKeys.length > 0 ? (
+                      providerKeys.map((key) => {
+                        const isEnv = key.source === 'env';
+                        return (
+                          <div
+                            key={key.hash}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0.75rem 0.8rem',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                              <code style={{ fontSize: '0.85rem', color: '#e5e7eb', fontFamily: 'monospace' }}>
+                                {key.masked}
+                              </code>
+                              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+                                {t.keyHashLabel} <code style={{ fontFamily: 'monospace', color: '#d1d5db' }}>{key.hash.slice(0, 8)}</code>
+                              </span>
+                            </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{
-                              fontSize: '0.75rem',
-                              padding: '0.15rem 0.4rem',
-                              borderRadius: '4px',
-                              backgroundColor: isEnv ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                              color: isEnv ? '#60a5fa' : '#34d399',
-                              border: isEnv ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
-                            }}>
-                              {isEnv ? t.keySourceEnv : t.keySourceKv}
-                            </span>
-
-                            <button
-                              onClick={() => onTestKey(selectedProvider, key.hash)}
-                              disabled={operationLoading || testingHash !== null}
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '4px',
-                                border: '1px solid rgba(59, 130, 246, 0.3)',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                color: '#60a5fa',
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{
                                 fontSize: '0.75rem',
-                                cursor: operationLoading || testingHash !== null ? 'not-allowed' : 'pointer',
-                                opacity: operationLoading || testingHash !== null ? 0.5 : 1,
-                                transition: 'all 0.2s',
-                              }}
-                              onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; }}
-                              onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; }}
-                            >
-                              {testingHash === key.hash ? t.btnTestingKey : t.btnTestKey}
-                            </button>
+                                padding: '0.15rem 0.4rem',
+                                borderRadius: '4px',
+                                backgroundColor: isEnv ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                color: isEnv ? '#60a5fa' : '#34d399',
+                                border: isEnv ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)',
+                              }}>
+                                {isEnv ? t.keySourceEnv : t.keySourceKv}
+                              </span>
+
+                              <select
+                                value={selectedModels[key.hash] || ''}
+                                onChange={(e) => setSelectedModels(prev => ({ ...prev, [key.hash]: e.target.value }))}
+                                disabled={operationLoading || testingHash !== null}
+                                style={{
+                                  padding: '0.15rem 1.8rem 0.15rem 0.4rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                                  color: '#d1d5db',
+                                  fontSize: '0.75rem',
+                                  outline: 'none',
+                                  cursor: 'pointer',
+                                  appearance: 'none',
+                                  backgroundImage: `url("data:image/svg+xml;utf8,<svg fill='none' height='12' stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' viewBox='0 0 24 24' width='12' xmlns='http://www.w3.org/2000/svg'><polyline points='6 9 12 15 18 9'/></svg>")`,
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'right 0.4rem center',
+                                  backgroundSize: '0.6rem',
+                                }}
+                              >
+                                <option value="">{lang === 'zh' ? '自动 (默认)' : 'Auto (Default)'}</option>
+                                {models.map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.displayName || m.id}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                onClick={() => onTestKey(selectedProvider, key.hash, selectedModels[key.hash])}
+                                disabled={operationLoading || testingHash !== null}
+                                style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                  color: '#60a5fa',
+                                  fontSize: '0.75rem',
+                                  cursor: operationLoading || testingHash !== null ? 'not-allowed' : 'pointer',
+                                  opacity: operationLoading || testingHash !== null ? 0.5 : 1,
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; }}
+                                onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'; }}
+                              >
+                                {testingHash === key.hash ? t.btnTestingKey : t.btnTestKey}
+                              </button>
 
                             <button
                               onClick={() => onDeleteKey(selectedProvider, key.hash)}
@@ -478,13 +512,13 @@ export default function KeysTab({
                             </button>
                           </div>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ color: '#9ca3af', fontSize: '0.9rem', padding: '1.5rem', textAlign: 'center' }}>
-                      {t.noKeysConfigured}
-                    </div>
-                  )}
+                      })
+                    ) : (
+                      <div style={{ color: '#9ca3af', fontSize: '0.9rem', padding: '1.5rem', textAlign: 'center' }}>
+                        {t.noKeysConfigured}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

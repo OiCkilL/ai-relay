@@ -578,7 +578,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleTestKeyGeneral = async (providerId: string, hash: string) => {
+  const handleTestKeyGeneral = async (providerId: string, hash: string, model?: string) => {
     setTestingHash(hash);
     try {
       const res = await fetch(`/api/admin/providers/${providerId}/keys/test`, {
@@ -587,7 +587,7 @@ export default function AdminPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ hash }),
+        body: JSON.stringify({ hash, model }),
       });
       const resData = await res.json();
       if (!res.ok) {
