@@ -13,6 +13,7 @@ interface ProviderInfo {
   availableKeys: number;
   configured: boolean;
   modelPrefixes: string[];
+  models?: Array<{ id: string; displayName: string }>;
   errors?: Record<string, number>;
   keyErrors?: Array<{
     keyHash: string;
@@ -117,6 +118,19 @@ const TRANSLATIONS = {
     generatedKeyLabel: '生成的临时密钥（点击可选择）：',
     expiresAtLabel: '过期时间：',
     tempKeyNotice: '⚠️ 注意：该临时 Key 使用 HMAC 签名进行无状态校验，一旦生成便无法在后台撤销或编辑，过期后会自动失效。请妥善保管。',
+
+    // Model testing tool
+    testToolTitle: '🧪 模型与密钥可用性测试',
+    testToolDesc: '直接选择当前配置有 API Key 的模型，使用系统密钥池或输入自定义 API Key 发送 ping 请求，验证该模型在 Relay 后端及上游服务商的实际可用性。',
+    testModelLabel: '测试模型：',
+    useCustomKeyLabel: '使用自定义 API Key 进行测试',
+    customKeyPlaceholder: '请输入待测试的自定义 API Key (例如 sk-...)',
+    btnRunTest: '开始测试',
+    btnTesting: '测试中...',
+    testResultSuccess: '✅ 测试成功！此密钥/密钥池可以正常调用该模型。',
+    testResultFailed: '❌ 测试失败！',
+    testResultFailedDetails: '状态码: {status}，错误信息: {error}',
+    noConfiguredModels: '当前没有已配置 API Key 的模型可供测试，请先在“密钥管理”中添加密钥。',
 
     // Provider Key Pools
     providerKeyPools: '🔑 服务商密钥池',
@@ -250,6 +264,19 @@ const TRANSLATIONS = {
     generatedKeyLabel: 'Generated Key (Click to Copy):',
     expiresAtLabel: 'Expires At:',
     tempKeyNotice: '⚠️ Note: This temporary key is validated statelessly using HMAC. Once generated, it cannot be revoked or modified in this panel and will expire automatically.',
+
+    // Model testing tool
+    testToolTitle: '🧪 Model & Key Connectivity Test',
+    testToolDesc: 'Directly select models with configured API keys, and send a ping request using either the system key pool or a custom API key, verifying the actual availability of the model on the Relay backend and upstream providers.',
+    testModelLabel: 'Test Model:',
+    useCustomKeyLabel: 'Use custom API key for testing',
+    customKeyPlaceholder: 'Enter custom API key to test (e.g. sk-...)',
+    btnRunTest: 'Run Test',
+    btnTesting: 'Testing...',
+    testResultSuccess: '✅ Test successful! The key/key pool can successfully call this model.',
+    testResultFailed: '❌ Test failed!',
+    testResultFailedDetails: 'Status: {status}, Error: {error}',
+    noConfiguredModels: 'No models with configured API keys available for testing. Please add keys in the "Keys" tab first.',
 
     // Provider Key Pools
     providerKeyPools: '🔑 Provider Key Pools',
@@ -969,6 +996,7 @@ export default function AdminPage() {
             apiKey={apiKey}
             lang={lang}
             t={t}
+            providers={data?.providers || []}
           />
         )}
       </div>

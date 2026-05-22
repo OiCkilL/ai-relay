@@ -55,6 +55,31 @@ interface OverviewTabProps {
   onResetQuota: () => Promise<void>;
 }
 
+const ERROR_CODE_EXPLANATIONS: Record<'zh' | 'en', Record<string, string>> = {
+  zh: {
+    '400': '参数错误',
+    '401': 'Key无效/未授权',
+    '403': '无权限/被拒绝',
+    '404': '未找到/模型不存在',
+    '429': '触发限流/额度不足',
+    '500': '服务器内部错误',
+    '502': '网关错误',
+    '503': '服务不可用',
+    '504': '网关超时',
+  },
+  en: {
+    '400': 'Bad Request',
+    '401': 'Unauthorized / Invalid Key',
+    '403': 'Forbidden / No Access',
+    '404': 'Not Found',
+    '429': 'Rate Limit Exceeded',
+    '500': 'Internal Error',
+    '502': 'Bad Gateway',
+    '503': 'Service Unavailable',
+    '504': 'Gateway Timeout',
+  }
+};
+
 export default function OverviewTab({
   data,
   apiKey,
@@ -316,16 +341,19 @@ export default function OverviewTab({
                 
                 {/* Summary by status code */}
                 <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-                  {Object.entries(p.errors!).map(([code, count]) => (
-                    <span key={code} style={{
-                      padding: '0.3rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem',
-                      backgroundColor: code === '429' ? 'rgba(245, 158, 11, 0.15)' : code.startsWith('4') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                      color: code === '429' ? '#fbbf24' : code.startsWith('4') ? '#fca5a5' : '#9ca3af',
-                      border: '1px solid rgba(255, 255, 255, 0.06)',
-                    }}>
-                      HTTP {code}: <strong>{count}</strong> {t.times}
-                    </span>
-                  ))}
+                  {Object.entries(p.errors!).map(([code, count]) => {
+                    const explanation = ERROR_CODE_EXPLANATIONS[lang]?.[code] || '';
+                    return (
+                      <span key={code} style={{
+                        padding: '0.3rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem',
+                        backgroundColor: code === '429' ? 'rgba(245, 158, 11, 0.15)' : code.startsWith('4') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                        color: code === '429' ? '#fbbf24' : code.startsWith('4') ? '#fca5a5' : '#9ca3af',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                      }}>
+                        HTTP {code} {explanation ? `(${explanation})` : ''}: <strong>{count}</strong> {t.times}
+                      </span>
+                    );
+                  })}
                 </div>
                 
                 {/* Per-key breakdown */}
@@ -337,16 +365,19 @@ export default function OverviewTab({
                           key:{ke.keyHash.slice(0, 8)}
                         </span>
                         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                          {Object.entries(ke.errors).map(([code, detail]) => (
-                            <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                              <span style={{ color: '#fca5a5' }}>HTTP {code}×{detail.count}</span>
-                              {detail.reason && (
-                                <span style={{ color: '#6b7280' }}>
-                                  ({detail.reason})
-                                </span>
-                              )}
-                            </span>
-                          ))}
+                          {Object.entries(ke.errors).map(([code, detail]) => {
+                            const explanation = ERROR_CODE_EXPLANATIONS[lang]?.[code] || '';
+                            return (
+                              <span key={code} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <span style={{ color: '#fca5a5' }}>HTTP {code} {explanation ? `(${explanation})` : ''}×{detail.count}</span>
+                                {detail.reason && (
+                                  <span style={{ color: '#6b7280' }}>
+                                    ({detail.reason})
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
                         </div>
                         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginLeft: 'auto' }}>
                           <button

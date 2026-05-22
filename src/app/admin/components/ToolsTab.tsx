@@ -1,16 +1,95 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
 interface ToolsTabProps {
   apiKey: string;
   lang: 'zh' | 'en';
   t: any;
+  providers: any[];
 }
 
-export default function ToolsTab({ apiKey, lang, t }: ToolsTabProps) {
+export default function ToolsTab({ apiKey, lang, t, providers }: ToolsTabProps) {
   // Temporary Key Generator States
   const [tempDuration, setTempDuration] = useState<number>(86400); // Default 1 day (86400 seconds)
+
+  // Model & Key Connectivity Test States
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [useCustomKey, setUseCustomKey] = useState<boolean>(false);
+  const [customKey, setCustomKey] = useState<string>('');
+  const [testLoading, setTestLoading] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; status?: number; error?: string } | null>(null);
+
+  // Extract all models from configured providers
+  const testableModels = useMemo(() => {
+    return providers
+      .filter((p) => p.keyCount > 0)
+      .flatMap((p) => {
+        return (p.models || []).map((m: any) => ({
+          modelId: m.id,
+          displayName: m.displayName,
+          providerId: p.id,
+          providerName: p.name,
+        }));
+      });
+  }, [providers]);
+
+  // Set default model once models are loaded
+  useEffect(() => {
+    if (testableModels.length > 0 && !selectedModel) {
+      setSelectedModel(testableModels[0].modelId);
+    }
+  }, [testableModels, selectedModel]);
+
+  const handleRunTest = async () => {
+    if (!selectedModel) return;
+    const modelObj = testableModels.find((m) => m.modelId === selectedModel);
+    if (!modelObj) return;
+
+    setTestLoading(true);
+    setTestResult(null);
+
+    try {
+      const payload: any = { model: selectedModel };
+      if (useCustomKey && customKey.trim()) {
+        payload.key = customKey.trim();
+      }
+
+      const res = await fetch(`/api/admin/providers/${modelObj.providerId}/keys/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setTestResult({
+          success: false,
+          status: res.status,
+          error: data.error?.message || 'Verification request failed',
+        });
+      } else if (data.valid) {
+        setTestResult({ success: true });
+      } else {
+        setTestResult({
+          success: false,
+          status: data.status || 400,
+          error: data.error || 'Invalid API Key',
+        });
+      }
+    } catch (e: any) {
+      setTestResult({
+        success: false,
+        status: 500,
+        error: e instanceof Error ? e.message : 'Unknown network/server error',
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
   const [generatedKey, setGeneratedKey] = useState<string>('');
   const [generatedKeyExpires, setGeneratedKeyExpires] = useState<string>('');
   const [tempKeyLoading, setTempKeyLoading] = useState<boolean>(false);
@@ -207,6 +286,159 @@ export default function ToolsTab({ apiKey, lang, t }: ToolsTabProps) {
         }}>
           {t.tempKeyNotice}
         </div>
+      </section>
+
+      {/* Model & Key Connectivity Test */}
+      <section className="glass-panel">
+        <h2 style={{ fontSize: '1.25rem', marginTop: 0, marginBottom: '0.5rem', color: '#fff', fontWeight: 600 }}>
+          {t.testToolTitle}
+        </h2>
+        <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: 0, marginBottom: '1.5rem', lineHeight: '1.5' }}>
+          {t.testToolDesc}
+        </p>
+
+        {testableModels.length === 0 ? (
+          <div style={{
+            padding: '1rem',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(239, 68, 68, 0.05)',
+            border: '1px solid rgba(239, 68, 68, 0.15)',
+            color: '#fca5a5',
+            fontSize: '0.9rem',
+          }}>
+            {t.noConfiguredModels}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Model Selection */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ color: '#d1d5db', fontSize: '0.9rem', fontWeight: 500 }}>
+                {t.testModelLabel}
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => {
+                  setSelectedModel(e.target.value);
+                  setTestResult(null);
+                }}
+                disabled={testLoading}
+                className="custom-select"
+                style={{
+                  width: '100%',
+                  maxWidth: '500px',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                {testableModels.map((m) => (
+                  <option key={`${m.providerId}:${m.modelId}`} value={m.modelId}>
+                    [{m.providerName}] {m.displayName} ({m.modelId})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Custom Key Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <input
+                type="checkbox"
+                id="useCustomKey"
+                checked={useCustomKey}
+                onChange={(e) => {
+                  setUseCustomKey(e.target.checked);
+                  setTestResult(null);
+                }}
+                disabled={testLoading}
+                style={{ cursor: 'pointer', width: '1.1rem', height: '1.1rem' }}
+              />
+              <label htmlFor="useCustomKey" style={{ color: '#d1d5db', fontSize: '0.9rem', cursor: 'pointer', userSelect: 'none' }}>
+                {t.useCustomKeyLabel}
+              </label>
+            </div>
+
+            {/* Custom Key Input */}
+            {useCustomKey && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%', maxWidth: '500px' }}>
+                <input
+                  type="password"
+                  placeholder={t.customKeyPlaceholder}
+                  value={customKey}
+                  onChange={(e) => setCustomKey(e.target.value)}
+                  disabled={testLoading}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 1rem',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Run Button */}
+            <div>
+              <button
+                onClick={handleRunTest}
+                disabled={testLoading || !selectedModel || (useCustomKey && !customKey.trim())}
+                style={{
+                  padding: '0.5rem 2rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem',
+                  cursor: testLoading ? 'wait' : 'pointer',
+                  opacity: (testLoading || !selectedModel || (useCustomKey && !customKey.trim())) ? 0.5 : 1,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#2563eb'; }}
+                onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#3b82f6'; }}
+              >
+                {testLoading ? t.btnTesting : t.btnRunTest}
+              </button>
+            </div>
+
+            {/* Test Result Display */}
+            {testResult && (
+              <div style={{
+                marginTop: '0.5rem',
+                padding: '1.25rem',
+                borderRadius: '8px',
+                backgroundColor: testResult.success ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                border: testResult.success ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(239, 68, 68, 0.15)',
+                color: testResult.success ? '#34d399' : '#fca5a5',
+                fontSize: '0.9rem',
+                lineHeight: '1.5',
+              }}>
+                {testResult.success ? (
+                  <div style={{ fontWeight: 500 }}>{t.testResultSuccess}</div>
+                ) : (
+                  <div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.25rem' }}>{t.testResultFailed}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#f87171', wordBreak: 'break-all' }}>
+                      {t.testResultFailedDetails
+                        .replace('{status}', String(testResult.status || 'unknown'))
+                        .replace('{error}', testResult.error || '')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

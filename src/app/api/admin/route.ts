@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       availableKeys: stats?.available || 0,
       configured: !!process.env[config.envKeyField],
       modelPrefixes: config.modelPrefixes,
+      models: (config.models || []).map(m => ({ id: m.id, displayName: m.displayName })),
     };
   });
 

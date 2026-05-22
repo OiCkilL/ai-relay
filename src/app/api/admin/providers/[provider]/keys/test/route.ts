@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     );
   }
 
-  let body: { key?: string; hash?: string };
+  let body: { key?: string; hash?: string; model?: string };
   try {
     body = await request.json();
   } catch {
@@ -63,11 +63,22 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       );
     }
     testKey = match;
+  } else {
+    // Default to the first configured key in the provider's key pool
+    const managed = await getManagedKeys(providerName);
+    const envKeys = (process.env[provider.envKeyField] || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+    const currentKeys = managed ?? envKeys;
+    if (currentKeys.length > 0) {
+      testKey = currentKeys[0];
+    }
   }
 
   if (!testKey) {
     return Response.json(
-      { error: { message: 'Must provide either key or hash', code: 400 } },
+      { error: { message: `No configured API keys found for provider: ${provider.displayName}`, code: 400 } },
       { status: 400 }
     );
   }
@@ -75,7 +86,9 @@ export async function POST(request: NextRequest, { params }: { params: Params })
   // Construct upstream request parameters
   const url = getUpstreamUrl(provider);
   const isAnthropic = provider.headerFormat === 'anthropic';
-  const targetModel = resolveFallbackModel('gpt-3.5-turbo', providerName);
+  const targetModel = (body.model && typeof body.model === 'string' && body.model.trim().length > 0)
+    ? body.model.trim()
+    : resolveFallbackModel('gpt-3.5-turbo', providerName);
   const upstreamModel = resolveUpstreamModel(targetModel, provider);
 
   const testBody: ChatCompletionRequest = {
