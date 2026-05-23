@@ -34,3 +34,6 @@ yarn-error.log*
 next-env.d.ts
 .env.local.production
 .env.local.preview
+
+# production env (contains secrets)
+.env.production
