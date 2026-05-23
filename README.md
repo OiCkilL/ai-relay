@@ -159,6 +159,60 @@ Access at `/admin` with your `RELAY_ADMIN_KEY`:
 | **Usage Stats** | View request counts and token usage |
 | **Key Pool Status** | Real-time sync status of all keys |
 
+### 🏁 Comparison with Similar Projects
+
+AI Relay is a **lightweight, self-deployable relay layer** — not a full platform. Here's how it differs from other popular solutions:
+
+| Feature | AI Relay | OpenRouter | OneAPI / new-api | FastGPT |
+|---------|----------|------------|------------------|---------|
+| **Deployment** | Vercel one-click (Edge) | SaaS only | Self-hosted (Docker) | Self-hosted (Docker) |
+| **Infra Cost** | Free (Vercel free tier) | Pay-per-use | Requires server | Requires server |
+| **Cold Start** | < 50ms (Edge) | N/A (SaaS) | Seconds | Seconds |
+| **Admin UI** | ✅ Built-in | ✅ Web dashboard | ✅ Web dashboard | ✅ Web dashboard |
+| **Multi-Key Rotation** | ✅ Round-robin + 429 backoff | ✅ Managed | ✅ | ✅ |
+| **Circuit Breaker** | ✅ Provider-level | ❌ | ❌ | ❌ |
+| **Fallback Chains** | ✅ Provider → Key (configurable) | ✅ Auto | ✅ Basic | ✅ Basic |
+| **Concurrency Control** | ✅ Token bucket + queue | Rate-limited | ❌ | ❌ |
+| **Webhook Alerts** | ✅ WeCom/Feishu/DingTalk/Slack | ❌ | ❌ | ✅ Webhook |
+| **Virtual Model Mapping** | ✅ | ✅ | ✅ | ✅ |
+| **Temp API Keys** | ✅ HMAC-SHA256 signed | ❌ | ✅ | ✅ |
+| **OpenAI Compatible** | ✅ | ✅ | ✅ | Partial |
+| **Primary Use Case** | Personal / small team relay | API marketplace | Multi-key management | Knowledge base + API |
+
+**When to choose AI Relay:**
+- You want a **zero-cost, serverless** relay that deploys in 2 minutes
+- You need **multi-provider fallback** with circuit breaker protection
+- You prefer **Edge Runtime** for global low-latency access
+- You don't need a full platform — just a reliable API proxy layer
+
+**When to choose alternatives:**
+- **OpenRouter**: You want access to 100+ models via a managed marketplace with billing built in
+- **OneAPI / new-api**: You need a mature self-hosted solution with extensive token management and user systems
+- **FastGPT**: You're building a knowledge-base application and need integrated RAG capabilities
+
+### 🙏 Acknowledgments & References
+
+AI Relay stands on the shoulders of these excellent open-source projects:
+
+- **[OpenRouter](https://openrouter.ai)** — Pioneered the multi-provider API aggregation model; demonstrated that unified endpoints dramatically simplify AI application development
+- **[OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api)** — The go-to open-source API management system; inspired our multi-key rotation and quota management design
+- **[FastGPT](https://github.com/labring/FastGPT)** — Showed how API relay can be tightly integrated with knowledge-base workflows; our webhook system draws from their notification architecture
+- **[Vercel](https://vercel.com)** — Edge Runtime and KV storage make serverless AI relay possible with zero infrastructure overhead
+- **[OpenAI](https://platform.openai.com)** — The OpenAI-compatible API standard has become the de facto interface for LLM services
+
+### 🎯 Use Cases
+
+| Scenario | Description |
+|----------|-------------|
+| **Individual Developers** | Consolidate multiple API keys into a single endpoint; never hit rate limits mid-debugging thanks to automatic key rotation and fallback |
+| **Small Teams / Startups** | Share a relay instance across the team with quota management; admin dashboard provides visibility without exposing raw API keys |
+| **CI/CD Pipelines** | Use temporary HMAC-signed keys for ephemeral build agents; keys auto-expire, no cleanup needed |
+| **Multi-Region Apps** | Edge Runtime ensures < 50ms latency worldwide; circuit breaker prevents cascading failures when a provider has regional outages |
+| **Cost Optimization** | Route requests to cheaper providers (e.g., DeepSeek for simple tasks, GPT-4o for complex ones) via virtual model mapping |
+| **Enterprise Internal Tools** | Deploy as an internal API gateway with webhook alerts to WeCom/Feishu/DingTalk for usage monitoring and anomaly detection |
+
+---
+
 ### 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -317,6 +371,60 @@ Client → Edge Runtime (全球分发, <50ms 延迟)
 | **自定义 Provider** | 添加 / 编辑 / 删除自定义 Provider |
 | **用量统计** | 查看请求次数和 Token 用量 |
 | **Key Pool 状态** | 实时同步所有密钥状态 |
+
+### 🏁 同类项目对比
+
+AI Relay 的定位是**轻量级、自部署的中转层**，而非完整平台。以下是与主流方案的对比：
+
+| 特性 | AI Relay | OpenRouter | OneAPI / new-api | FastGPT |
+|------|----------|------------|------------------|---------|
+| **部署方式** | Vercel 一键部署（Edge） | 纯 SaaS | 自托管（Docker） | 自托管（Docker） |
+| **基础设施成本** | 免费（Vercel 免费层） | 按量付费 | 需要服务器 | 需要服务器 |
+| **冷启动** | < 50ms（Edge） | N/A（SaaS） | 秒级 | 秒级 |
+| **管理后台** | ✅ 内置 | ✅ Web 控制台 | ✅ Web 控制台 | ✅ Web 控制台 |
+| **多 Key 轮换** | ✅ Round-robin + 429 退避 | ✅ 托管式 | ✅ | ✅ |
+| **熔断器** | ✅ Provider 级别 | ❌ | ❌ | ❌ |
+| **Fallback 链** | ✅ Provider → Key（可配置） | ✅ 自动 | ✅ 基础 | ✅ 基础 |
+| **并发控制** | ✅ 令牌桶 + 队列 | 限流 | ❌ | ❌ |
+| **Webhook 告警** | ✅ 企业微信/飞书/钉钉/Slack | ❌ | ❌ | ✅ Webhook |
+| **虚拟模型映射** | ✅ | ✅ | ✅ | ✅ |
+| **临时 API Key** | ✅ HMAC-SHA256 签名 | ❌ | ✅ | ✅ |
+| **OpenAI 兼容** | ✅ | ✅ | ✅ | 部分 |
+| **主要场景** | 个人 / 小团队中转 | API 市场 | 多 Key 管理 | 知识库 + API |
+
+**选择 AI Relay 的场景：**
+- 你想要一个**零成本、无服务器**的中转方案，2 分钟内部署完成
+- 你需要**多 Provider 故障转移**和熔断保护
+- 你偏好 **Edge Runtime** 带来的全球低延迟访问
+- 你不需要完整平台，只需要一个可靠的 API 代理层
+
+**选择其他方案的场景：**
+- **OpenRouter**：你需要通过托管市场访问 100+ 模型，且希望内置计费功能
+- **OneAPI / new-api**：你需要成熟的自托管方案，有完善的 Token 管理和用户体系
+- **FastGPT**：你在构建知识库应用，需要集成 RAG 能力
+
+### 🙏 致谢与参考
+
+AI Relay 站在这些优秀开源项目的肩膀上：
+
+- **[OpenRouter](https://openrouter.ai)** — 开创了多 Provider API 聚合模式，证明统一端点能极大简化 AI 应用开发
+- **[OneAPI](https://github.com/songquanpeng/one-api) / [new-api](https://github.com/Calcium-Ion/new-api)** — 最流行的开源 API 管理系统，我们的多 Key 轮换和配额管理设计受其启发
+- **[FastGPT](https://github.com/labring/FastGPT)** — 展示了 API 中转与知识库工作流的深度整合，我们的 Webhook 系统参考了其通知架构
+- **[Vercel](https://vercel.com)** — Edge Runtime 和 KV 存储让无服务器 AI 中转成为可能，零基础设施开销
+- **[OpenAI](https://platform.openai.com)** — OpenAI 兼容 API 标准已成为 LLM 服务的事实接口
+
+### 🎯 使用场景
+
+| 场景 | 说明 |
+|------|------|
+| **个人开发者** | 将多个 API Key 整合为单一端点；调试时不会因限流中断，自动 Key 轮换和故障转移保障连续性 |
+| **小团队 / 创业公司** | 团队共享一个中转实例，配合配额管理；Admin 后台提供用量可见性，无需暴露原始 API Key |
+| **CI/CD 流水线** | 使用 HMAC 签名的临时密钥为临时构建代理提供访问；密钥自动过期，无需手动清理 |
+| **多地域应用** | Edge Runtime 确保全球 < 50ms 延迟；熔断器在 Provider 区域性故障时防止级联失败 |
+| **成本优化** | 通过虚拟模型映射将请求路由到更便宜的 Provider（简单任务用 DeepSeek，复杂任务用 GPT-4o） |
+| **企业内部工具** | 作为内部 API 网关部署，配合企业微信/飞书/钉钉 Webhook 告警，实现用量监控和异常检测 |
+
+---
 
 ### 🤝 贡献
 
