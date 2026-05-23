@@ -36,6 +36,7 @@
 - **Health Check** — `/health` endpoint for monitoring
 - **Virtual Model Mapping** — Map virtual model names to real models
 - **One-Click Deploy** — Deploy to Vercel in under 2 minutes
+- 📢 **Webhook Notifications** — Daily usage reports & quota alerts via WeCom / Feishu / DingTalk / Slack
 - **📱 Mobile Friendly** — Responsive admin dashboard, manage relay strategies on the go
 
 ### 📸 Screenshots
@@ -176,8 +177,50 @@ Access at `/admin` with your `RELAY_ADMIN_KEY`:
 | **Custom Providers** | Add / edit / delete custom providers |
 | **Usage Stats** | View request counts and token usage |
 | **Key Pool Status** | Real-time sync status of all keys |
+| **Notification Settings** | Configure Webhook push, alert thresholds, report schedule |
 
 > 💡 **Mobile Friendly**: The admin dashboard features a responsive design, allowing you to adjust relay strategies, view usage, and manage keys from your phone anytime, anywhere.
+
+### 📢 Notifications & Alerts
+
+AI Relay supports pushing daily usage reports and quota alerts to your team collaboration platforms via Webhooks.
+
+#### Supported Platforms
+
+| Platform | Description |
+|----------|-------------|
+| **WeCom** | Group bot Webhook, Markdown format |
+| **Feishu** | Custom bot, Feishu message card |
+| **DingTalk** | Group bot Webhook, Markdown format |
+| **Slack** | Incoming Webhook, Block Kit format |
+| **Generic Webhook** | Any HTTP endpoint with customizable JSON template |
+
+#### Configuration
+
+1. Log in to the Admin dashboard, go to the **Notification Settings** tab
+2. Click "Add Webhook" and select the platform type
+3. Enter the Webhook URL (obtain from the corresponding platform's group bot settings)
+4. Once enabled, click "Test" to verify connectivity
+
+#### Daily Usage Reports
+
+The system sends daily usage reports via Vercel Cron at a scheduled time, including:
+- Total requests and token consumption for the day
+- Per-provider breakdown
+- Comparison with the previous day (percentage change)
+
+Default report time: `21:00` (adjustable in notification settings, supports custom timezone).
+
+#### Quota Alerts
+
+Configure alert thresholds in notification settings:
+- **Per-Provider** — Set daily request/token limits for each provider individually
+- **Global Threshold** — Use `*` as the provider name to set a global threshold
+- When actual usage exceeds the threshold, alerts are automatically sent to all enabled Webhooks
+
+#### Test Connectivity
+
+In the Admin dashboard's notification settings, each Webhook configuration has a "Test" button. Click it to send a test message and verify the Webhook URL is working correctly.
 
 ### 🏁 Comparison with Similar Projects
 
