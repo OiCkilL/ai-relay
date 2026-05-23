@@ -82,6 +82,7 @@ export default function ModelKeyTest({
     try {
       const res = await fetch(`/api/admin/providers/${providerId}/keys`, {
         headers: { Authorization: `Bearer ${apiKey}` },
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();

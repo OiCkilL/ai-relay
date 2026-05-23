@@ -7,6 +7,7 @@ import { requireAdminAuth } from '@/lib/admin';
 import { KVUsageStorage } from '@/lib/usage';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const usageStorage = new KVUsageStorage();
@@ -55,5 +56,9 @@ export async function GET(request: NextRequest) {
     range,
     granularity,
     ...trend,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+    }
   });
 }

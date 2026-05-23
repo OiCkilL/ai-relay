@@ -60,6 +60,7 @@ export function useAdminHandlers(apiKey: string, t: any) {
     try {
       const res = await fetch('/api/admin', {
         headers: { Authorization: `Bearer ${apiKey}` },
+        cache: 'no-store',
       });
       if (res.status === 401) {
         setError('unauthorized');
@@ -84,9 +85,11 @@ export function useAdminHandlers(apiKey: string, t: any) {
       const [keysRes, fallbacksRes] = await Promise.all([
         fetch(`/api/admin/providers/${providerId}/keys`, {
           headers: { Authorization: `Bearer ${apiKey}` },
+          cache: 'no-store',
         }),
         fetch(`/api/admin/providers/${providerId}/fallbacks`, {
           headers: { Authorization: `Bearer ${apiKey}` },
+          cache: 'no-store',
         }),
       ]);
 

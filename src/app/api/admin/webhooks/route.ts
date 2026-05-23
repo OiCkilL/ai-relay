@@ -11,6 +11,7 @@ import { requireAdminAuth } from '@/lib/admin';
 import { getWebhookSettings, saveWebhookSettings, addWebhook, updateWebhook, deleteWebhook } from '@/lib/admin/admin-config';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const VALID_PLATFORMS = ['wecom', 'feishu', 'dingtalk', 'slack', 'generic'];
 
@@ -24,7 +25,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const settings = await getWebhookSettings();
-    return Response.json({ success: true, settings });
+    return Response.json({ success: true, settings }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      }
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: { message, code: 500 } }, { status: 500 });

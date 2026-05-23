@@ -52,7 +52,7 @@ async function loadManagedKeys(providerName: string): Promise<ApiKey[] | null> {
   try {
     const { getManagedKeys } = await import('../admin/admin-config');
     const managed = await getManagedKeys(providerName);
-    if (managed && managed.length > 0) {
+    if (managed !== null) {
       return managed.map((key) => ({
         key,
         hash: hashKey(key),

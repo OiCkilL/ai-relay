@@ -9,6 +9,7 @@ import { hashKey, updateMemoryKeyPool } from '@/lib/relay';
 import { getAllProviders } from '@/lib/providers';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 type Params = Promise<{ provider: string }>;
 
@@ -58,6 +59,10 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
     source,
     count: keyList.length,
     keys: keyList,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+    }
   });
 }
 

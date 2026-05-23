@@ -8,6 +8,7 @@ import { requireAdminAuth, getFallbackChain, setFallbackChain, clearFallbackChai
 import { getAllProviders } from '@/lib/providers';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 type Params = Promise<{ provider: string }>;
 
@@ -48,6 +49,10 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
     staticDefaults: staticFallbacks,
     isOverride,
     availableModels,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+    }
   });
 }
 

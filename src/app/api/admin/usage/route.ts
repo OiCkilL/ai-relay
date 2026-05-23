@@ -10,6 +10,7 @@ import { KVUsageStorage } from '@/lib/usage';
 import { getAllProviders } from '@/lib/providers';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 const usageStorage = new KVUsageStorage();
@@ -75,5 +76,9 @@ export async function GET(request: NextRequest) {
       allowed: quota.allowed,
     },
     providers,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, max-age=0',
+    }
   });
 }

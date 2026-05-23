@@ -70,6 +70,7 @@ export default function AdminPage() {
       setLoading(true);
       fetch('/api/admin', {
         headers: { Authorization: `Bearer ${cached}` },
+        cache: 'no-store',
       })
         .then((res) => {
           if (res.status === 401) {
