@@ -147,6 +147,26 @@ describe('KV command optimization', () => {
     });
   });
 
+  it('tracks quota usage counters even when no quota limit is configured', async () => {
+    installMockKV();
+    const storage = new KVUsageStorage();
+
+    await expect(storage.checkQuota(true)).resolves.toMatchObject({
+      allowed: true,
+      dailyUsed: 1,
+      dailyLimit: 0,
+      monthlyUsed: 1,
+      monthlyLimit: 0,
+    });
+    await expect(storage.checkQuota()).resolves.toMatchObject({
+      allowed: true,
+      dailyUsed: 1,
+      dailyLimit: 0,
+      monthlyUsed: 1,
+      monthlyLimit: 0,
+    });
+  });
+
   it('reads provider error stats through a single pipeline', async () => {
     const kv = installMockKV();
     const storage = new KVUsageStorage();

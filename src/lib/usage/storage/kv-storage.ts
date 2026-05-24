@@ -871,7 +871,7 @@ export class KVUsageStorage implements UsageStorage {
     }
 
     const kv = await getKV();
-    if (!kv || (!dailyLimit && !monthlyLimit)) {
+    if (!kv) {
       return { allowed: true, dailyUsed: 0, dailyLimit, monthlyUsed: 0, monthlyLimit, isOverride };
     }
 
