@@ -525,6 +525,8 @@ export default function ProviderConfigEditor({
                         alignItems: 'center',
                         padding: '0.6rem 0.8rem',
                         borderBottom: idx < activeFallbacks.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                        gap: '0.5rem',
+                        flexWrap: 'wrap',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
@@ -541,7 +543,7 @@ export default function ProviderConfigEditor({
                           justifyContent: 'center',
                           flexShrink: 0,
                         }}>{idx + 1}</span>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#f3f4f6', flexShrink: 0 }}>{fbName}</span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#f3f4f6', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{fbName}</span>
                         
                         {/* Model selector */}
                         <select
