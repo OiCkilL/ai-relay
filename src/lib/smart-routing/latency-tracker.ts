@@ -18,6 +18,9 @@ const cacheTimestamps = new Map<string, number>();
 /** Write debounce: minimum interval between KV writes per provider */
 const WRITE_INTERVAL_MS = 60_000; // 60s
 const lastWriteAt = new Map<string, number>();
+/** Dirty record count since last write — flush early if enough accumulate */
+const dirtyCount = new Map<string, number>();
+const DIRTY_FLUSH_THRESHOLD = 5;
 
 /** Max samples per provider (sliding window) */
 const MAX_SAMPLES = 100;
@@ -62,12 +65,18 @@ async function loadFromKV(provider: string): Promise<LatencyRecord[]> {
 
 /**
  * Save latency records to KV (debounced, fire-and-forget).
+ * Writes if: 60s elapsed since last write OR dirty count >= threshold.
  */
 function saveToKV(provider: string, records: LatencyRecord[]): void {
   const now = Date.now();
   const lastWrite = lastWriteAt.get(provider) || 0;
-  if (now - lastWrite < WRITE_INTERVAL_MS) return;
+  const dirty = (dirtyCount.get(provider) || 0) + 1;
+  dirtyCount.set(provider, dirty);
+
+  if (now - lastWrite < WRITE_INTERVAL_MS && dirty < DIRTY_FLUSH_THRESHOLD) return;
+
   lastWriteAt.set(provider, now);
+  dirtyCount.set(provider, 0);
 
   getKV().then((kv: any) => {
     if (kv) {

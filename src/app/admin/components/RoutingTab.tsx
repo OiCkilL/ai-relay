@@ -264,6 +264,12 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+
+  const showMessage = (text: string, type: 'success' | 'error' = 'success') => {
+    setMessage(text);
+    setMessageType(type);
+  };
 
   // Editable config state
   const [editConfig, setEditConfig] = useState<Partial<RoutingConfig>>({});
@@ -295,8 +301,8 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
     fetchRouting();
   }, [fetchRouting]);
 
-  // Save config changes
-  const saveConfig = async (updates: Partial<RoutingConfig>) => {
+  // Save config changes. Returns true on success, false on failure.
+  const saveConfig = async (updates: Partial<RoutingConfig>): Promise<boolean> => {
     try {
       setSaving(true);
       setMessage('');
@@ -310,11 +316,13 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || 'Failed to save');
-      setMessage(t.configSaved);
+      showMessage(t.configSaved, 'success');
       setEditConfig({});
       await fetchRouting();
+      return true;
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : String(err));
+      showMessage(err instanceof Error ? err.message : String(err), 'error');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -322,12 +330,8 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
 
   // Switch strategy
   const switchStrategy = async (strategy: RoutingStrategy) => {
-    try {
-      await saveConfig({ strategy });
-      setMessage(t.strategySwitched);
-    } catch {
-      // saveConfig already sets error message via its own catch
-    }
+    const ok = await saveConfig({ strategy });
+    if (ok) showMessage(t.strategySwitched, 'success');
   };
 
   // Reset provider failures
@@ -345,10 +349,10 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
         const json = await res.json();
         throw new Error(json.error?.message || 'Failed to reset');
       }
-      setMessage(t.resetSuccess);
+      showMessage(t.resetSuccess, 'success');
       await fetchRouting();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : String(err));
+      showMessage(err instanceof Error ? err.message : String(err), 'error');
     }
   };
 
@@ -430,12 +434,11 @@ export default function RoutingTab({ apiKey, lang }: RoutingTabProps) {
       {message && (
         <div style={{
           marginTop: '1rem', padding: '0.75rem 1rem', borderRadius: '8px',
-          background: message.includes('失败') || message.includes('Failed') || message.includes('Error')
+          background: messageType === 'error'
             ? 'rgba(248, 113, 113, 0.1)' : 'rgba(52, 211, 153, 0.1)',
-          border: `1px solid ${message.includes('失败') || message.includes('Failed') || message.includes('Error')
+          border: `1px solid ${messageType === 'error'
             ? 'rgba(248, 113, 113, 0.2)' : 'rgba(52, 211, 153, 0.2)'}`,
-          color: message.includes('失败') || message.includes('Failed') || message.includes('Error')
-            ? '#f87171' : '#34d399',
+          color: messageType === 'error' ? '#f87171' : '#34d399',
           fontSize: '0.9rem',
         }}>
           {message}

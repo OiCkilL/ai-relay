@@ -39,7 +39,7 @@ interface RotationLogEntry {
   type: 'rotate' | 'add' | 'pause' | 'alert';
   detail: string;
   actor: string;
-  result: 'success' | 'failed';
+  result: 'success' | 'failed' | 'partial';
 }
 
 interface SecurityTabProps {
@@ -116,6 +116,17 @@ const T = {
     oldKey: '旧 Key',
     newKey: '新 Key',
     alert401: '401 错误率上升',
+    oldKeyDeleteFailed: '旧 Key 删除失败，请手动移除',
+    noRotationRecords: '暂无轮换记录',
+    logRotate: '轮换',
+    logAdd: '添加',
+    logPause: '暂停',
+    logAlert: '告警',
+    nextStep: '下一步',
+    switchStrategy: '切换策略',
+    prevStep: '上一步',
+    switching: '切换中...',
+    doneBtn: '完成',
   },
   en: {
     title: '🛡️ Key Security',
@@ -181,6 +192,17 @@ const T = {
     oldKey: 'Old Key',
     newKey: 'New Key',
     alert401: '401 Error Rate Rising',
+    oldKeyDeleteFailed: 'Failed to delete old key, please remove manually',
+    noRotationRecords: 'No rotation records',
+    logRotate: 'Rotate',
+    logAdd: 'Add',
+    logPause: 'Pause',
+    logAlert: 'Alert',
+    nextStep: 'Next',
+    switchStrategy: 'Switch Strategy',
+    prevStep: 'Back',
+    switching: 'Switching...',
+    doneBtn: 'Done',
   },
 };
 
@@ -358,13 +380,13 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
 
       // Step 2: Delete old key (by hash)
       // Note: The existing delete API uses key hash
+      let deleteOldFailed = false;
       const delRes = await fetch(`/api/admin/keys?provider=${rotateTarget.providerId}&keyHash=${rotateTarget.keyHash}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!delRes.ok) {
-        // If delete fails, new key was added but old wasn't removed — still a success-ish
-        console.warn('Failed to delete old key, but new key was added');
+        deleteOldFailed = true;
       }
 
       // Log the rotation
@@ -374,9 +396,11 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
         provider: rotateTarget.provider,
         keyHash: rotateTarget.keyHash,
         type: 'rotate',
-        detail: `${t.manualRotate}: key-${rotateTarget.keyIndex} → 新 Key (${switchMode === 'gradual' ? '渐进切换' : '立即切换'})`,
+        detail: deleteOldFailed
+          ? `${t.manualRotate}: key-${rotateTarget.keyIndex} → ${t.newKey} (${t.oldKeyDeleteFailed})`
+          : `${t.manualRotate}: key-${rotateTarget.keyIndex} → ${t.newKey} (${switchMode === 'gradual' ? t.gradualSwitch : t.immediateSwitch})`,
         actor: 'admin',
-        result: 'success',
+        result: deleteOldFailed ? 'partial' : 'success',
       };
       const updatedLog = [entry, ...logEntries].slice(0, 100);
       setLogEntries(updatedLog);
@@ -391,7 +415,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
         provider: rotateTarget.provider,
         keyHash: rotateTarget.keyHash,
         type: 'rotate',
-        detail: `${t.manualRotate} 失败: ${e instanceof Error ? e.message : String(e)}`,
+        detail: `${t.manualRotate} ${t.error}: ${e instanceof Error ? e.message : String(e)}`,
         actor: 'admin',
         result: 'failed',
       };
@@ -660,15 +684,15 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
         }}>
           {logEntries.length === 0 ? (
             <p style={{ color: '#6b7280', textAlign: 'center', padding: '1rem', fontSize: '13px' }}>
-              {lang === 'zh' ? '暂无轮换记录' : 'No rotation records'}
+              {t.noRotationRecords}
             </p>
           ) : (
             logEntries.slice(0, 20).map((entry) => {
               const typeColors = {
-                rotate: { bg: 'rgba(96,165,250,0.1)', color: '#60a5fa', label: lang === 'zh' ? '轮换' : 'Rotate' },
-                add: { bg: 'rgba(52,211,153,0.1)', color: '#34d399', label: lang === 'zh' ? '添加' : 'Add' },
-                pause: { bg: 'rgba(251,191,36,0.1)', color: '#fbbf24', label: lang === 'zh' ? '暂停' : 'Pause' },
-                alert: { bg: 'rgba(248,113,113,0.1)', color: '#f87171', label: lang === 'zh' ? '告警' : 'Alert' },
+                rotate: { bg: 'rgba(96,165,250,0.1)', color: '#60a5fa', label: t.logRotate },
+                add: { bg: 'rgba(52,211,153,0.1)', color: '#34d399', label: t.logAdd },
+                pause: { bg: 'rgba(251,191,36,0.1)', color: '#fbbf24', label: t.logPause },
+                alert: { bg: 'rgba(248,113,113,0.1)', color: '#f87171', label: t.logAlert },
               };
               const tc = typeColors[entry.type];
               return (
@@ -841,7 +865,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
                       opacity: testResult?.ok ? 1 : 0.4,
                     }}
                   >
-                    {lang === 'zh' ? '下一步' : 'Next'}
+                    {t.nextStep}
                   </button>
                 </div>
               </div>
@@ -892,7 +916,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
                 {/* Switch mode */}
                 <div style={{ marginBottom: '20px' }}>
                   <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>
-                    {lang === 'zh' ? '切换策略' : 'Switch Strategy'}
+                    {t.switchStrategy}
                   </div>
                   {(['immediate', 'gradual'] as const).map(mode => (
                     <label key={mode} style={{
@@ -916,7 +940,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
                     color: '#9ca3af', fontSize: '13px', border: '1px solid rgba(255,255,255,0.08)',
                     cursor: 'pointer',
                   }}>
-                    {lang === 'zh' ? '上一步' : 'Back'}
+                    {t.prevStep}
                   </button>
                   <button
                     onClick={confirmRotate}
@@ -928,7 +952,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
                       cursor: rotating ? 'wait' : 'pointer',
                     }}
                   >
-                    {rotating ? (lang === 'zh' ? '切换中...' : 'Switching...') : t.confirm}
+                    {rotating ? t.switching : t.confirm}
                   </button>
                 </div>
               </div>
@@ -952,7 +976,7 @@ export default function SecurityTab({ apiKey, lang }: SecurityTabProps) {
                   background: 'linear-gradient(135deg, #2563eb, #8b5cf6)', color: '#fff',
                   fontSize: '13px', fontWeight: 600, border: 'none', cursor: 'pointer',
                 }}>
-                  {lang === 'zh' ? '完成' : 'Done'}
+                  {t.doneBtn}
                 </button>
               </div>
             )}

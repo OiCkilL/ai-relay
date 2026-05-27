@@ -42,6 +42,9 @@ const recentSwitches: Array<{
 }> = [];
 const MAX_SWITCH_LOG = 50;
 
+/** Recovery probe tracking: provider → last probe timestamp */
+const lastProbeAt = new Map<string, number>();
+
 /** Request counter */
 let totalRequests = 0;
 const routingSince = Date.now();
@@ -245,6 +248,20 @@ export async function smartRoute(
   }
 
   if (shouldFailover(requestedProvider, config)) {
+    // Recovery probe: periodically route one request to the failed provider
+    // to give it a chance to prove it has recovered.
+    const recoveryMs = (config.recoverySeconds || 30) * 1000;
+    const lastProbe = lastProbeAt.get(requestedProvider) || 0;
+    if (Date.now() - lastProbe >= recoveryMs) {
+      lastProbeAt.set(requestedProvider, Date.now());
+      return {
+        provider: requestedProvider,
+        reason: 'Recovery probe',
+        score: 0,
+        fallbackChain: [],
+      };
+    }
+
     const decision = await routeByStrategy(config, providerHealthMap, undefined, latencyMap);
     if (decision.provider !== requestedProvider) {
       logSwitch(requestedProvider, decision.provider, `Auto-failover: ${failureCounters.get(requestedProvider)} consecutive failures`);
