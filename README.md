@@ -16,7 +16,7 @@
 
 <p><strong><a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#environment-variables">👉 立即一键部署</a></strong> · <a href="#-一键部署2-分钟上线你的-ai-api-网关">查看部署步骤</a></p>
 
-[![Version](https://img.shields.io/badge/Version-2.4.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.5.0-green.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
 [![Edge Runtime](https://img.shields.io/badge/Edge_Runtime-⚡-black?logo=vercel)](https://vercel.com/docs/functions/edge-functions)
@@ -78,6 +78,8 @@
 | **Webhook 通知** | 企微 / 飞书 / 钉钉 / Slack，日报 + 超限告警 |
 | **临时 API Key** | HMAC-SHA256 无状态签名，自动过期 |
 | **虚拟模型映射** | 将虚拟模型名路由到真实 Provider |
+| **智能路由** | 延迟优先 / 成本优先 / 可用性优先，自动选择最优 Provider |
+| **API Key 安全管理** | Key 遮掩展示、健康监控、轮换告警、审计日志 |
 
 ## 🚀 一键部署：2 分钟上线你的 AI API 网关
 

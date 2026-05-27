@@ -16,7 +16,7 @@
 
 <p><strong><a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#environment-variables">👉 Deploy Now</a></strong> · <a href="#-one-click-deploy-launch-your-ai-api-gateway-in-2-minutes">View setup steps</a></p>
 
-[![Version](https://img.shields.io/badge/Version-2.4.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.5.0-green.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
 [![Edge Runtime](https://img.shields.io/badge/Edge_Runtime-⚡-black?logo=vercel)](https://vercel.com/docs/functions/edge-functions)
@@ -78,6 +78,8 @@
 | **Webhook Notifications** | WeCom / Feishu / DingTalk / Slack — daily reports + alerts |
 | **Temp API Keys** | HMAC-SHA256 stateless signing, auto-expiring |
 | **Virtual Model Mapping** | Route virtual model names to real providers |
+| **Smart Routing** | Latency / cost / availability priority, auto-select optimal provider |
+| **API Key Security** | Masked display, health monitoring, rotation alerts, audit logs |
 
 ## 🚀 One-Click Deploy: Launch Your AI API Gateway in 2 Minutes
 
