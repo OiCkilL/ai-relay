@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 interface ModelKeyTestProps {
   apiKey: string;
@@ -76,8 +76,7 @@ export default function ModelKeyTest({
     }
   }, [selectedProviderId, providers, selectedModelId]);
 
-  // Fetch keys for the current provider
-  const fetchKeys = async (providerId: string) => {
+  const fetchKeys = useCallback(async (providerId: string) => {
     setKeysLoading(true);
     try {
       const res = await fetch(`/api/admin/providers/${providerId}/keys`, {
@@ -88,14 +87,10 @@ export default function ModelKeyTest({
         const data = await res.json();
         const keys = data.keys || [];
         setProviderKeys(keys);
-        if (keys.length > 0) {
-          const exists = keys.some((k: any) => k.hash === selectedKeyHash);
-          if (!exists) {
-            setSelectedKeyHash(keys[0].hash);
-          }
-        } else {
-          setSelectedKeyHash('');
-        }
+        setSelectedKeyHash(prev => {
+          const exists = keys.some((k: any) => k.hash === prev);
+          return exists ? prev : (keys[0]?.hash || '');
+        });
       } else {
         setProviderKeys([]);
         setSelectedKeyHash('');
@@ -106,9 +101,8 @@ export default function ModelKeyTest({
     } finally {
       setKeysLoading(false);
     }
-  };
+  }, [apiKey]);
 
-  // Fetch keys when selected provider changes
   useEffect(() => {
     if (selectedProviderId) {
       fetchKeys(selectedProviderId);
