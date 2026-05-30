@@ -74,7 +74,8 @@ jobs:
             if grep -q "database_id" wrangler.toml; then
               sed -i.bak "s/database_id = .*/database_id = \"$DATABASE_ID\"/" wrangler.toml
             else
-              awk -v id="$DATABASE_ID" '/database_name = "ai-relay"/ {print; print "database_id = \"" id "\""; next}1' wrangler.toml > wrangler.toml.tmp && mv wrangler.toml.tmp wrangler.toml
+              # Insert database_id after database_name line
+              sed -i.bak "/database_name = \"ai-relay\"/a database_id = \"$DATABASE_ID\"" wrangler.toml
             fi
           fi
 
@@ -95,7 +96,8 @@ jobs:
             if grep -q "id = " wrangler.toml; then
               sed -i.bak "s/id = .*/id = \"$KV_ID\"/" wrangler.toml
             else
-              awk -v id="$KV_ID" '/binding = "KV"/ {print; print "id = \"" id "\""; next}1' wrangler.toml > wrangler.toml.tmp && mv wrangler.toml.tmp wrangler.toml
+              # Insert id after binding = "KV" line
+              sed -i.bak "/binding = \"KV\"/a id = \"$KV_ID\"" wrangler.toml
             fi
           fi
 
