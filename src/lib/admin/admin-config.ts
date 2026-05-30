@@ -1498,5 +1498,46 @@ export async function importStatsData(payload: Record<string, any>): Promise<voi
   }
 
   await pipeline.exec();
+
+  // On CF, also write usage data to D1 so the chart reads from the correct store
+  try {
+    const { getCFEnv } = await import('@/lib/cf-env');
+    const cfEnv = getCFEnv();
+    if (cfEnv?.DB) {
+      const d1Stmts: any[] = [];
+      const upsertSql = `INSERT INTO daily_usage (date, provider, requests, tokens, prompt_tokens, completion_tokens)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (date, provider) DO UPDATE SET
+           requests = excluded.requests, tokens = excluded.tokens,
+           prompt_tokens = excluded.prompt_tokens, completion_tokens = excluded.completion_tokens`;
+
+      for (const [date, raw] of Object.entries(usageDaily as Record<string, any>)) {
+        if (!raw || typeof raw !== 'object') continue;
+        d1Stmts.push(cfEnv.DB.prepare(upsertSql).bind(
+          date, '',
+          Number(raw.requests || 0), Number(raw.tokens || 0),
+          Number(raw.promptTokens || 0), Number(raw.completionTokens || 0)
+        ));
+      }
+
+      for (const [provider, datesData] of Object.entries(usageProviderDaily as Record<string, Record<string, any>>)) {
+        if (!datesData || typeof datesData !== 'object') continue;
+        for (const [date, raw] of Object.entries(datesData)) {
+          if (!raw || typeof raw !== 'object') continue;
+          d1Stmts.push(cfEnv.DB.prepare(upsertSql).bind(
+            date, provider,
+            Number(raw.requests || 0), Number(raw.tokens || 0),
+            Number(raw.promptTokens || 0), Number(raw.completionTokens || 0)
+          ));
+        }
+      }
+
+      for (let i = 0; i < d1Stmts.length; i += 100) {
+        await cfEnv.DB.batch(d1Stmts.slice(i, i + 100));
+      }
+    }
+  } catch {
+    // Non-critical: D1 write failure should not fail the whole import
+  }
 }
 
