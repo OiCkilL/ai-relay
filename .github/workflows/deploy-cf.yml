@@ -57,21 +57,52 @@ jobs:
           export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}"
           export CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}"
 
-          # Check and create D1 database if not exists
+          # Check and create D1 database if not exists, then extract database_id
           if ! pnpm exec wrangler d1 list | grep -q "ai-relay"; then
             echo "Creating D1 database: ai-relay"
-            pnpm exec wrangler d1 create ai-relay
+            D1_OUTPUT=$(pnpm exec wrangler d1 create ai-relay)
+            echo "$D1_OUTPUT"
+            DATABASE_ID=$(echo "$D1_OUTPUT" | grep -oP 'database_id = "\K[^"]+' || echo "$D1_OUTPUT" | grep -oP "database_id = '\K[^']+" || true)
           else
-            echo "D1 database ai-relay already exists"
+            echo "D1 database ai-relay already exists, fetching database_id"
+            DATABASE_ID=$(pnpm exec wrangler d1 list | grep "ai-relay" | awk '{print $2}')
           fi
 
-          # Check and create KV namespace if not exists
+          if [ -n "$DATABASE_ID" ]; then
+            echo "D1 database_id: $DATABASE_ID"
+            # Update wrangler.toml with database_id
+            if grep -q "database_id" wrangler.toml; then
+              sed -i.bak "s/database_id = .*/database_id = \"$DATABASE_ID\"/" wrangler.toml
+            else
+              # Insert database_id after database_name line
+              sed -i.bak "/database_name = \"ai-relay\"/a database_id = \"$DATABASE_ID\"" wrangler.toml
+            fi
+          fi
+
+          # Check and create KV namespace if not exists, then extract id
           if ! pnpm exec wrangler kv namespace list | grep -q "ai-relay"; then
             echo "Creating KV namespace: ai-relay"
-            pnpm exec wrangler kv namespace create ai-relay
+            KV_OUTPUT=$(pnpm exec wrangler kv namespace create ai-relay)
+            echo "$KV_OUTPUT"
+            KV_ID=$(echo "$KV_OUTPUT" | grep -oP 'id = "\K[^"]+' || echo "$KV_OUTPUT" | grep -oP "id = '\K[^']+" || true)
           else
-            echo "KV namespace ai-relay already exists"
+            echo "KV namespace ai-relay already exists, fetching id"
+            KV_ID=$(pnpm exec wrangler kv namespace list | grep "ai-relay" | awk '{print $2}')
           fi
+
+          if [ -n "$KV_ID" ]; then
+            echo "KV namespace id: $KV_ID"
+            # Update wrangler.toml with KV id
+            if grep -q "id = " wrangler.toml; then
+              sed -i.bak "s/id = .*/id = \"$KV_ID\"/" wrangler.toml
+            else
+              # Insert id after binding = "KV" line
+              sed -i.bak "/binding = \"KV\"/a id = \"$KV_ID\"" wrangler.toml
+            fi
+          fi
+
+          echo "Updated wrangler.toml:"
+          cat wrangler.toml
 
       - name: Build for Cloudflare Pages
         run: pnpm exec opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
