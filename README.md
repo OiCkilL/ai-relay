@@ -2,11 +2,11 @@
 
 <img src="docs/assets/logo-banner.svg" alt="AI Relay" width="400">
 
-**无服务器 AI API 中转网关：一键部署到 Vercel 或 Cloudflare，2 分钟拥有自己的多 Provider AI Relay**
+**无服务器 AI API 中转网关：一键部署到 Vercel，或通过 GitHub Actions 自动部署到 Cloudflare**
 
 <h3>🚀 <a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#environment-variables">一键部署到 Vercel，2 分钟上线你的 AI API 网关</a> · <a href="#-部署到-cloudflare-pages全自动">部署到 Cloudflare Pages</a></h3>
 
-<p>不用买服务器，不用维护 Docker，支持 <strong>Vercel</strong> 和 <strong>Cloudflare Pages</strong> 双平台一键部署，只需填写 3 个环境变量，即可拥有自己的多 Provider AI Relay。</p>
+<p>不用买服务器，不用维护 Docker。Vercel 一键部署即开即用；Cloudflare 通过 GitHub Actions 推送即部署，D1 + KV 全自动配置。</p>
 
 <p>
   <a href="https://vercel.com/new/clone?repository-url=https://github.com/MoyuFamily/ai-relay&env=RELAY_API_KEY,RELAY_ADMIN_KEY,RELAY_SIGNING_SECRET&envDescription=API%20authentication%20keys%20(required%20for%20security)&envLink=https://github.com/MoyuFamily/ai-relay#environment-variables">
@@ -34,11 +34,11 @@
 
 > 🚀 **不用买服务器，不用写后端，不用维护 Docker。**
 >
-> AI Relay 基于 Edge Runtime 构建，支持 **Vercel** 和 **Cloudflare Pages** 双平台一键部署。配置 3 个环境变量，即可获得一个支持 OpenAI / Claude / DeepSeek / 自定义 Provider 的无服务器 AI API 中转网关。
+> AI Relay 基于 Edge Runtime 构建。**Vercel** 一键部署即开即用；**Cloudflare Pages** 通过 GitHub Actions 推送即部署，D1 + KV + Cron 全自动配置。支持 OpenAI / Claude / DeepSeek / 自定义 Provider。
 
 | 你关心的 | AI Relay 的答案 |
 |---|---|
-| **怎么部署？** | 支持 Vercel 和 Cloudflare Pages 双平台，点一下即可部署，约 2 分钟上线 |
+| **怎么部署？** | Vercel：点按钮填变量，2 分钟上线 · Cloudflare：Fork + 配 Secrets，push 即部署 |
 | **要服务器吗？** | 不需要 VPS，不需要 Docker，不需要后端运维 |
 | **能免费跑吗？** | 个人 / 小团队可从免费层开始；Vercel + Upstash（每月 50 万次 KV 操作）或 Cloudflare（D1 + KV 免费层）均可零成本启动 |
 | **接入复杂吗？** | OpenAI SDK 只改 `base_url`，继续使用 `/v1/chat/completions` |
@@ -64,7 +64,7 @@
 | 特性 | 说明 |
 |------|------|
 | **无服务器架构** | 基于 Edge Runtime（Vercel / Cloudflare），无需购买 VPS / 维护 Docker / 管理后端服务 |
-| **一键部署** | Vercel 或 Cloudflare Pages 双平台一键部署，填写 3 个环境变量，约 2 分钟上线 |
+| **一键部署** | Vercel 一键部署即开即用；Cloudflare 通过 GitHub Actions 推送即部署，D1 + KV 全自动配置 |
 | **免费层可用** | 个人和小团队可从 Vercel 或 Cloudflare 免费层开始跑起来 |
 | **OpenAI 兼容** | 直接用 OpenAI SDK 对接，零改动 |
 | **多 Provider 路由** | OpenAI · Claude · DeepSeek · MiMo · 自定义 |
@@ -240,7 +240,7 @@ npm run dev  # http://localhost:3000
 ## 为什么选择 AI Relay？
 
 - **不用服务器**：跑在 Edge Runtime，无需 VPS、Docker、运维。
-- **双平台可选**：Vercel 或 Cloudflare Pages，一键部署，不绑定单一平台。
+- **双平台可选**：Vercel 一键部署；Cloudflare 通过 GitHub Actions 推送即部署，不绑定单一平台。
 - **部署足够快**：点击按钮 + 填环境变量，2 分钟完成上线。
 - **成本足够低**：个人开发者和小团队可以从免费层开始。
 - **接入足够简单**：兼容 OpenAI API，现有 SDK 只需改 `base_url`。
