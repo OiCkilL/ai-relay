@@ -90,6 +90,8 @@ function buildQuotaResult(
 }
 
 export class D1UsageStorage implements UsageStorage {
+  readonly shouldRecordDirect = true;
+
   constructor(private db: D1Database) {}
 
   async record(event: UsageEvent): Promise<void> {

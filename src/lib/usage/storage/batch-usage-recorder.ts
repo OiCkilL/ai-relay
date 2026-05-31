@@ -13,7 +13,6 @@
 
 import type { UsageStorage, UsageEvent } from '../sdk';
 import { getUsageSamplingInfo, shouldSample } from './kv-storage';
-import { isCloudflare } from '@/lib/cf-env';
 
 const MAX_BATCH_SIZE = 100;
 const FLUSH_INTERVAL_MS = 60_000;
@@ -30,6 +29,7 @@ export class BatchUsageRecorder {
   private errorPending = new Map<string, { count: number; reason: string; keyHash: string; provider: string; statusCode: number }>();
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private storage: UsageStorage | null = null;
+  private shouldRecordDirect = false;
   private totalPending = 0;
   private destroyed = false;
   private flushing = false;
@@ -39,6 +39,7 @@ export class BatchUsageRecorder {
    */
   setStorage(storage: UsageStorage): void {
     this.storage = storage;
+    this.shouldRecordDirect = (storage as { shouldRecordDirect?: boolean }).shouldRecordDirect === true;
   }
 
   /**
@@ -51,8 +52,8 @@ export class BatchUsageRecorder {
   async record(event: UsageEvent): Promise<void> {
     if (this.destroyed) return;
 
-    // Cloudflare Workers: bypass memory buffer, write directly to D1
-    if (await isCloudflare()) {
+    // Cloudflare D1 writes must complete within the request lifecycle.
+    if (this.shouldRecordDirect) {
       if (this.storage) {
         await this.storage.record(event);
       }

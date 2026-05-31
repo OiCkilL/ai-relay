@@ -19,6 +19,10 @@ export interface CFEnv {
 }
 
 export async function getCFEnv(): Promise<CFEnv | null> {
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return null;
+  }
+
   try {
     const { getCloudflareContext } = require('@opennextjs/cloudflare');
     const context = await getCloudflareContext({ async: true });
@@ -32,4 +36,3 @@ export async function getCFEnv(): Promise<CFEnv | null> {
 export async function isCloudflare(): Promise<boolean> {
   return (await getCFEnv()) !== null;
 }
-
