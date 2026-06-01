@@ -8,6 +8,19 @@
 
 （暂无）
 
+## [2.9.0] - 2026-06-01
+
+### Added
+- **D1 per-key 错误统计**：新增每个 API Key 的错误统计功能，通过 D1 数据库记录各 Key 的错误详情，便于定位问题 Key。
+
+### Changed
+- **Vercel 部署跳过 Cloudflare 上下文**：Vercel 环境不再加载 Cloudflare 上下文，避免不必要的环境检测开销。
+- **同步化 Cloudflare 环境访问**：重构 CF 环境检测逻辑为同步模式，优化静态路由预渲染，提升 Cloudflare Pages 部署性能。
+- **重构部署脚本**：优化 GitHub Actions 部署工作流的 node 脚本部分。
+
+### Fixed
+- **Cloudflare 异步 fallback 兼容**：修复 Admin 配置和报表存储模块的 CF 环境解析，支持异步 fallback 机制。
+
 ## [2.8.0] - 2026-05-31
 
 ### Added
