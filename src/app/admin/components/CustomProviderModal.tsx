@@ -88,6 +88,12 @@ export default function CustomProviderModal({
       setFormUserAgent(editingCustomProvider.userAgent || '');
       setFormModels(editingCustomProvider.models || []);
       setFetchedProviderModels([]);
+
+      // Pre-fill test model from existing models
+      const existingModels = editingCustomProvider.models || [];
+      if (existingModels.length > 0) {
+        setTestModelId(existingModels[0].id);
+      }
     } else {
       const defaultTemplate = PROVIDER_TEMPLATES[0];
       setSelectedTemplateId(defaultTemplate.id);
@@ -332,10 +338,15 @@ export default function CustomProviderModal({
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.3rem' }}>
               {helperText.apiKey}
+              {editingCustomProvider && editingCustomProvider.keyCount > 0 && (
+                <span style={{ marginLeft: '0.5rem', color: '#6ee7b7', fontSize: '0.75rem' }}>
+                  ({lang === 'zh' ? `已有 ${editingCustomProvider.keyCount} 个密钥` : `${editingCustomProvider.keyCount} key(s) configured`})
+                </span>
+              )}
             </label>
             <input
               type="password"
-              placeholder="sk-..."
+              placeholder={editingCustomProvider ? (lang === 'zh' ? '可选：测试新密钥' : 'Optional: test new key') : 'sk-...'}
               value={apiKeyValue}
               onChange={(e) => setApiKeyValue(e.target.value)}
               style={{
@@ -349,6 +360,13 @@ export default function CustomProviderModal({
                 boxSizing: 'border-box',
               }}
             />
+            {editingCustomProvider && editingCustomProvider.keyCount > 0 && (
+              <div style={{ fontSize: '0.72rem', color: '#6b7280', marginTop: '0.35rem' }}>
+                {lang === 'zh'
+                  ? '编辑时无需重新输入已有密钥，如需测试新密钥请在此输入'
+                  : 'No need to re-enter existing keys. Enter here only to test a new key'}
+              </div>
+            )}
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: '#9ca3af', marginBottom: '0.3rem' }}>
