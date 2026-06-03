@@ -118,10 +118,15 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     // Capture precise error details from upstream if possible
     let errorMessage = '';
     try {
-      const errJson = await upstreamResponse.json();
-      errorMessage = errJson.error?.message || errJson.error || JSON.stringify(errJson);
+      const errText = await upstreamResponse.text();
+      try {
+        const errJson = JSON.parse(errText);
+        errorMessage = errJson.error?.message || errJson.error || JSON.stringify(errJson);
+      } catch {
+        errorMessage = errText;
+      }
     } catch {
-      errorMessage = await upstreamResponse.text();
+      errorMessage = upstreamResponse.statusText;
     }
 
     return Response.json({
