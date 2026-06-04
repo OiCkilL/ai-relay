@@ -76,4 +76,59 @@ describe('admin provider upstream model discovery', () => {
     const json = await res.json();
     expect(json.error.message).toContain('invalid api key');
   });
+
+  it('resolves key from hash: prefix in body.key', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      object: 'list',
+      data: [{ id: 'gpt-5.4-mini', object: 'model' }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const testSecret = 'sk-hashed-secret-key';
+    const { hashKey } = await import('../lib/relay/key-pool');
+    const computedHash = hashKey(testSecret);
+
+    vi.stubEnv('CUSTOM_OPENAI_KEYS', testSecret);
+
+    const { POST } = await import('../app/api/admin/providers/models/route');
+    const res = await POST(req({
+      providerConfig: {
+        name: 'custom_openai',
+        displayName: 'Custom OpenAI',
+        baseUrl: 'https://example.com/v1',
+        headerFormat: 'openai',
+        modelPrefixes: ['gpt-'],
+        envKeyField: 'CUSTOM_OPENAI_KEYS',
+      },
+      key: `hash:${computedHash}`,
+    }));
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/v1/models', expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: `Bearer ${testSecret}` }),
+    }));
+  });
+
+  it('returns structured 502 error when network fetch throws error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('fetch failed');
+    }));
+
+    const { POST } = await import('../app/api/admin/providers/models/route');
+    const res = await POST(req({
+      providerConfig: {
+        name: 'custom_openai',
+        displayName: 'Custom OpenAI',
+        baseUrl: 'https://example.com/v1',
+        headerFormat: 'openai',
+        modelPrefixes: ['gpt-'],
+        envKeyField: 'CUSTOM_OPENAI_KEYS',
+      },
+      key: 'sk-test-key',
+    }));
+
+    expect(res.status).toBe(502);
+    const json = await res.json();
+    expect(json.error.message).toContain('Upstream models fetch failed: fetch failed');
+  });
 });

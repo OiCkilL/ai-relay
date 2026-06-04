@@ -45,20 +45,28 @@ export async function POST(request: NextRequest, { params }: { params: Params })
     );
   }
 
+  let keyParam = body.key?.trim() || '';
+  let hashParam = body.hash?.trim() || '';
+
+  if (keyParam.startsWith('hash:')) {
+    hashParam = keyParam.slice(5);
+    keyParam = '';
+  }
+
   let testKey = '';
-  if (body.key && typeof body.key === 'string' && body.key.trim().length > 0) {
-    testKey = tryDecodeBase64(body.key.trim());
-  } else if (body.hash && typeof body.hash === 'string' && body.hash.trim().length > 0) {
+  if (keyParam) {
+    testKey = tryDecodeBase64(keyParam);
+  } else if (hashParam) {
     // Locate plaintext key from managed KV or static env keys by matching hash
     const managed = await getManagedKeys(providerName);
     const envKeys = provider.envKeyField
       ? (process.env[provider.envKeyField] || '').split(',').map((k) => k.trim()).filter(Boolean)
       : [];
     const currentKeys = managed ?? envKeys;
-    const match = currentKeys.find((k) => hashKey(k) === body.hash);
+    const match = currentKeys.find((k) => hashKey(k) === hashParam);
     if (!match) {
       return Response.json(
-        { error: { message: `No key found with hash: ${body.hash}`, code: 404 } },
+        { error: { message: `No key found with hash: ${hashParam}`, code: 404 } },
         { status: 404 }
       );
     }

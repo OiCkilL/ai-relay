@@ -45,7 +45,7 @@ interface KeysTabProps {
   onSaveCustomProvider: (provider: any) => Promise<void>;
   onTestCustomProvider: (provider: any, apiKeyValue: string, modelId?: string) => Promise<any>;
   onFetchProviderModels: (provider: any, apiKeyValue: string) => Promise<{ models: any[] }>;
-  onImportProviderLink?: (link: string) => Promise<void>;
+  onImportProviderLink?: (link: string) => Promise<boolean>;
   onDeleteCustomProvider: (name: string) => Promise<void>;
 }
 

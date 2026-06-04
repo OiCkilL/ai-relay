@@ -79,8 +79,16 @@ async function resolveProviderFromBody(body: DiscoverModelsBody): Promise<Provid
 }
 
 async function resolveKeyFromBody(provider: ProviderConfig, body: DiscoverModelsBody): Promise<string> {
-  if (body.key && typeof body.key === 'string' && body.key.trim()) {
-    return tryDecodeBase64(body.key.trim());
+  let keyParam = body.key?.trim() || '';
+  let hashParam = body.hash?.trim() || '';
+
+  if (keyParam.startsWith('hash:')) {
+    hashParam = keyParam.slice(5);
+    keyParam = '';
+  }
+
+  if (keyParam) {
+    return tryDecodeBase64(keyParam);
   }
 
   const managed = await getManagedKeys(provider.name);
@@ -89,9 +97,9 @@ async function resolveKeyFromBody(provider: ProviderConfig, body: DiscoverModels
     : [];
   const currentKeys = managed ?? envKeys;
 
-  if (body.hash && typeof body.hash === 'string' && body.hash.trim()) {
-    const matched = currentKeys.find((key) => hashKey(key) === body.hash);
-    if (!matched) throw new Error(`No key found with hash: ${body.hash}`);
+  if (hashParam) {
+    const matched = currentKeys.find((key) => hashKey(key) === hashParam);
+    if (!matched) throw new Error(`No key found with hash: ${hashParam}`);
     return matched;
   }
 
@@ -101,10 +109,15 @@ async function resolveKeyFromBody(provider: ProviderConfig, body: DiscoverModels
 
 async function readUpstreamError(response: Response): Promise<string> {
   try {
-    const json = await response.json();
-    return json.error?.message || json.error || JSON.stringify(json);
-  } catch {
-    return await response.text();
+    const text = await response.text();
+    try {
+      const json = JSON.parse(text);
+      return json.error?.message || json.error || text;
+    } catch {
+      return text;
+    }
+  } catch (err: any) {
+    return `Error reading upstream response: ${err.message}`;
   }
 }
 
@@ -140,33 +153,107 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let response: Response;
+  let finalBaseUrl = provider.baseUrl;
+  const initialUrl = getModelsUrl(provider);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch(getModelsUrl(provider), {
+    let res = await fetch(initialUrl, {
       method: 'GET',
       headers: buildHeaders(provider.headerFormat, apiKey, false, undefined, provider.userAgent),
       signal: controller.signal,
     });
-    clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const message = await readUpstreamError(response);
+    const contentType = res.headers.get('content-type') || '';
+    const isHtml = contentType.includes('text/html');
+
+    if (isHtml || !res.ok) {
+      if (!provider.baseUrl.endsWith('/v1') && !provider.baseUrl.endsWith('/v1/')) {
+        const fallbackBase = `${provider.baseUrl.replace(/\/+$/, '')}/v1`;
+        const fallbackUrl = `${fallbackBase}/models`;
+        try {
+          const fallbackRes = await fetch(fallbackUrl, {
+            method: 'GET',
+            headers: buildHeaders(provider.headerFormat, apiKey, false, undefined, provider.userAgent),
+            signal: controller.signal,
+          });
+          const fallbackContentType = fallbackRes.headers.get('content-type') || '';
+          if (fallbackRes.ok && !fallbackContentType.includes('text/html')) {
+            res = fallbackRes;
+            finalBaseUrl = fallbackBase;
+          }
+        } catch {
+          // ignore fallback error and keep original response
+        }
+      }
+    }
+    response = res;
+  } catch (err: any) {
+    if (!provider.baseUrl.endsWith('/v1') && !provider.baseUrl.endsWith('/v1/')) {
+      const fallbackBase = `${provider.baseUrl.replace(/\/+$/, '')}/v1`;
+      const fallbackUrl = `${fallbackBase}/models`;
+      try {
+        const fallbackRes = await fetch(fallbackUrl, {
+          method: 'GET',
+          headers: buildHeaders(provider.headerFormat, apiKey, false, undefined, provider.userAgent),
+          signal: controller.signal,
+        });
+        const fallbackContentType = fallbackRes.headers.get('content-type') || '';
+        if (fallbackRes.ok && !fallbackContentType.includes('text/html')) {
+          response = fallbackRes;
+          finalBaseUrl = fallbackBase;
+        } else {
+          clearTimeout(timeoutId);
+          return Response.json(
+            { error: { message: `Upstream models fetch failed: ${err.message}`, code: 502 } },
+            { status: 502 }
+          );
+        }
+      } catch {
+        clearTimeout(timeoutId);
+        return Response.json(
+          { error: { message: `Upstream models fetch failed: ${err.message}`, code: 502 } },
+          { status: 502 }
+        );
+      }
+    } else {
+      clearTimeout(timeoutId);
       return Response.json(
-        { error: { message: message || response.statusText, code: response.status } },
+        { error: { message: `Upstream models fetch failed: ${err.message}`, code: 502 } },
         { status: 502 }
       );
     }
+  }
 
-    const payload = await response.json();
-    const models = extractModels(payload);
-    return Response.json({ success: true, models, count: models.length, upstream: getModelsUrl(provider) });
-  } catch (err: any) {
-    clearTimeout(timeoutId);
+  clearTimeout(timeoutId);
+
+  if (!response.ok) {
+    const message = await readUpstreamError(response);
     return Response.json(
-      { error: { message: err.name === 'AbortError' ? 'Timeout (10s)' : err.message, code: 502 } },
+      { error: { message: message || response.statusText, code: response.status } },
       { status: 502 }
     );
   }
+
+  let payload: any;
+  try {
+    payload = await response.json();
+  } catch (err: any) {
+    return Response.json(
+      { error: { message: `Failed to parse upstream JSON response: ${err.message}`, code: 502 } },
+      { status: 502 }
+    );
+  }
+
+  const models = extractModels(payload);
+  return Response.json({
+    success: true,
+    models,
+    count: models.length,
+    upstream: finalBaseUrl === provider.baseUrl ? initialUrl : `${finalBaseUrl}/models`,
+    baseUrl: finalBaseUrl !== provider.baseUrl ? finalBaseUrl : undefined,
+  });
 }

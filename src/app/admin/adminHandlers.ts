@@ -486,7 +486,7 @@ export function useAdminHandlers(apiKey: string, t: any) {
     }
   }, [apiKey, t, fetchData]);
 
-  const handleImportProviderLink = useCallback(async (link: string) => {
+  const handleImportProviderLink = useCallback(async (link: string): Promise<boolean> => {
     setOperationLoading(true);
     setConfigMessage(null);
 
@@ -512,6 +512,9 @@ export function useAdminHandlers(apiKey: string, t: any) {
         const modelsData = await modelsRes.json();
         if (modelsRes.ok && Array.isArray(modelsData.models)) {
           discoveredModels = modelsData.models;
+          if (typeof modelsData.baseUrl === 'string' && modelsData.baseUrl) {
+            payload.baseUrl = modelsData.baseUrl;
+          }
         } else {
           discoverWarning = modelsData.error?.message || 'Failed to fetch provider models';
         }
@@ -561,10 +564,12 @@ export function useAdminHandlers(apiKey: string, t: any) {
         ? warningTemplate.replace('{provider}', providerConfig.displayName).replace('{reason}', discoverWarning)
         : successTemplate.replace('{provider}', providerConfig.displayName).replace('{count}', String(discoveredModels.length));
       setConfigMessage({ text, type: 'success' });
+      return true;
     } catch (e) {
       const messageKey = e instanceof Error ? e.message : 'import-provider-failed';
       const mapped = tRef.current.providerImportErrors?.[messageKey] || (e instanceof Error ? e.message : tRef.current.alertSaveProviderFailed);
       setConfigMessage({ text: mapped, type: 'error' });
+      return false;
     } finally {
       setOperationLoading(false);
     }

@@ -9,7 +9,7 @@ interface ProviderTableProps {
   setSelectedProvider: (providerId: string | null) => void;
   setEditingCustomProvider: (val: any) => void;
   setCustomProviderModalOpen: (val: boolean) => void;
-  onImportProviderLink?: (link: string) => Promise<void>;
+  onImportProviderLink?: (link: string) => Promise<boolean>;
   operationLoading?: boolean;
   t: any;
 }
@@ -67,9 +67,11 @@ export default function ProviderTable({
     if (!importLinkValue.trim() || !onImportProviderLink) return;
     setImporting(true);
     try {
-      await onImportProviderLink(importLinkValue.trim());
-      setImportLinkValue('');
-      setShowImportInput(false);
+      const success = await onImportProviderLink(importLinkValue.trim());
+      if (success) {
+        setImportLinkValue('');
+        setShowImportInput(false);
+      }
     } catch {
       // Errors are handled and displayed via configMessage in KeysTab
     } finally {

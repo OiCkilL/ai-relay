@@ -53,6 +53,21 @@ export function normalizeProviderId(id: string): string {
   return normalized || 'newapi';
 }
 
+export function deriveProviderIdFromBaseUrl(baseUrl: string): string {
+  try {
+    const url = new URL(baseUrl);
+    const hostname = url.hostname.toLowerCase();
+    const parts = hostname.split('.');
+    const commonPrefixes = new Set(['api', 'relay', 'openkey', 'gateway', 'gw']);
+    if (parts.length > 2 && commonPrefixes.has(parts[0])) {
+      parts.shift();
+    }
+    return normalizeProviderId(parts.join('_'));
+  } catch {
+    return 'newapi';
+  }
+}
+
 export function buildEnvKeyField(providerId: string): string {
   return `${providerId.toUpperCase()}_KEYS`;
 }
@@ -142,12 +157,13 @@ export function buildImportedProviderConfig(input: {
   providers: ProviderIdentity[];
   models?: DraftProviderPayload['models'];
 }): DraftProviderPayload {
-  const name = resolveImportedProviderId(input.payload.id, input.providers);
+  const derivedId = deriveProviderIdFromBaseUrl(input.payload.baseUrl);
+  const name = resolveImportedProviderId(derivedId, input.providers);
   const modelPrefixes = deriveModelPrefixesFromModels(input.models || []);
 
   return {
     name,
-    displayName: formatProviderDisplayName(input.payload.id),
+    displayName: formatProviderDisplayName(derivedId),
     baseUrl: input.payload.baseUrl,
     headerFormat: 'openai',
     modelPrefixes: modelPrefixes.length > 0 ? modelPrefixes : DEFAULT_NEWAPI_MODEL_PREFIXES,

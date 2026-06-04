@@ -3,6 +3,7 @@ import {
   buildImportedProviderConfig,
   deriveModelPrefixesFromModels,
   normalizeProviderId,
+  deriveProviderIdFromBaseUrl,
   parseProviderImportLink,
   resolveImportedProviderId,
 } from '@/app/admin/provider-import';
@@ -31,6 +32,13 @@ describe('NewAPI provider import links', () => {
     expect(normalizeProviderId('new-api')).toBe('new_api');
     expect(normalizeProviderId('  New API!!  ')).toBe('new_api');
     expect(normalizeProviderId('')).toBe('newapi');
+  });
+
+  it('derives provider ID from baseUrl domain', () => {
+    expect(deriveProviderIdFromBaseUrl('https://relay.example.com/v1')).toBe('example_com');
+    expect(deriveProviderIdFromBaseUrl('https://elysiver.h-e.top')).toBe('elysiver_h_e_top');
+    expect(deriveProviderIdFromBaseUrl('https://api.my-domain.org')).toBe('my_domain_org');
+    expect(deriveProviderIdFromBaseUrl('invalid-url')).toBe('newapi');
   });
 
   it('does not overwrite built-in providers with imported links', () => {
@@ -63,11 +71,11 @@ describe('NewAPI provider import links', () => {
       providers: [],
       models: [{ id: 'gpt-4o-mini', displayName: 'gpt-4o-mini', contextWindow: 128000 }],
     })).toMatchObject({
-      name: 'new_api',
-      displayName: 'New API',
+      name: 'example_com',
+      displayName: 'Example Com',
       baseUrl: 'https://relay.example.com/v1',
       headerFormat: 'openai',
-      envKeyField: 'NEW_API_KEYS',
+      envKeyField: 'EXAMPLE_COM_KEYS',
       modelPrefixes: ['gpt-4o-mini'],
     });
   });
