@@ -184,7 +184,7 @@ describe('Custom provider exact match and wildcard prefix routing tests', () => 
   });
 });
 
-import { validateBase64ImageSizes } from '../lib/relay/validation';
+import { validateBase64ImageSizes, validateRequestSize } from '../lib/relay/validation';
 
 describe('base64 image size validation tests', () => {
   it('should pass validation for small base64 images', () => {
@@ -221,5 +221,55 @@ describe('base64 image size validation tests', () => {
     const result = validateBase64ImageSizes(body);
     expect(result.valid).toBe(false);
     expect(result.error).toContain('Base64 image size exceeds the limit of 1MB');
+  });
+});
+
+describe('validateRequestSize (Cloudflare O(1) request-size cap)', () => {
+  const original = process.env.RELAY_MAX_REQUEST_BYTES;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.RELAY_MAX_REQUEST_BYTES;
+    } else {
+      process.env.RELAY_MAX_REQUEST_BYTES = original;
+    }
+  });
+
+  it('passes a request under the default 10MB cap', () => {
+    delete process.env.RELAY_MAX_REQUEST_BYTES;
+    const result = validateRequestSize(5 * 1024 * 1024);
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('passes a request exactly at the default cap', () => {
+    delete process.env.RELAY_MAX_REQUEST_BYTES;
+    const result = validateRequestSize(10 * 1024 * 1024);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a request over the default cap with a size message', () => {
+    delete process.env.RELAY_MAX_REQUEST_BYTES;
+    const result = validateRequestSize(10 * 1024 * 1024 + 1);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('exceeds the limit');
+  });
+
+  it('honors a custom RELAY_MAX_REQUEST_BYTES override', () => {
+    process.env.RELAY_MAX_REQUEST_BYTES = String(1024); // 1KB
+    expect(validateRequestSize(1024).valid).toBe(true);
+    expect(validateRequestSize(1025).valid).toBe(false);
+  });
+
+  it('disables the cap when RELAY_MAX_REQUEST_BYTES=0', () => {
+    process.env.RELAY_MAX_REQUEST_BYTES = '0';
+    const result = validateRequestSize(50 * 1024 * 1024);
+    expect(result.valid).toBe(true);
+  });
+
+  it('falls back to the default cap on an invalid override', () => {
+    process.env.RELAY_MAX_REQUEST_BYTES = 'not-a-number';
+    expect(validateRequestSize(10 * 1024 * 1024).valid).toBe(true);
+    expect(validateRequestSize(10 * 1024 * 1024 + 1).valid).toBe(false);
   });
 });
