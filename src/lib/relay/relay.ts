@@ -18,6 +18,7 @@ import {
 } from './rate-limiter';
 import { withConcurrency } from './concurrency';
 import { smartRoute, recordProviderResult, isSmartRoutingConfigured } from '../smart-routing';
+import { isCloudflareSync } from '../cf-env';
 
 // Module-level cached storage instance for error recording.
 // Falls back to KVUsageStorage synchronously on first call to avoid
@@ -37,6 +38,44 @@ async function getErrorStorage() {
 
 type RelayApiType = 'chat' | 'responses' | 'anthropicMessages';
 type RelayRequestBody = ChatCompletionRequest | ResponsesAPIRequest | AnthropicMessagesRequest;
+
+/**
+ * Whether the original request text can be forwarded upstream byte-for-byte
+ * instead of re-serializing the (possibly transformed) request body.
+ *
+ * Raw forwarding is the Cloudflare CPU optimization: it skips a JSON.stringify
+ * of large request bodies. It is ONLY safe when the outgoing body is provably
+ * semantically identical to the original request text — i.e. nothing rewrote
+ * the body. The body IS rewritten (→ not eligible) when any of:
+ *   - `modelChanged`: the upstream model differs from the requested one
+ *     (alias resolution, virtual→real model mapping, or fallback override), or
+ *   - `injectStreamOptions`: stream_options.include_usage was injected
+ *     (chat / non-anthropic / non-CF streaming), or
+ *   - chat → Anthropic transform (`apiType === 'chat' && isAnthropicProvider`,
+ *     via transformToAnthropic), or
+ *   - anthropicMessages → OpenAI transform (`apiType === 'anthropicMessages' &&
+ *     !isAnthropicProvider`, via transformAnthropicToOpenAI).
+ *
+ * The anthropicMessages→anthropic and responses paths only swap the model, so
+ * an unchanged model there leaves the body byte-identical and forwardable.
+ *
+ * Exported for direct unit testing of each disable condition.
+ */
+export function isRawForwardEligible(input: {
+  apiType: RelayApiType;
+  isAnthropicProvider: boolean;
+  modelChanged: boolean;
+  injectStreamOptions: boolean;
+}): boolean {
+  const { apiType, isAnthropicProvider, modelChanged, injectStreamOptions } = input;
+  const bodyRewritten =
+    modelChanged ||
+    injectStreamOptions ||
+    (apiType === 'chat' && isAnthropicProvider) ||
+    (apiType === 'anthropicMessages' && !isAnthropicProvider);
+  return !bodyRewritten;
+}
+
 const BROWSER_COMPAT_USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
   'Mozilla/5.0',
@@ -384,7 +423,9 @@ async function tryProviderWithRetries(
     // byte-counting passthrough in the route handlers), so we no longer need
     // to inject stream_options.include_usage. Skipping it keeps the body
     // byte-identical to the client's, which lets us forward the raw text below.
-    const injectStreamOptions = !!body.stream && !isAnthropic && !rawBody;
+    // Keyed to the actual CF runtime (not to rawBody presence) so a future
+    // non-CF caller passing rawBody can never accidentally suppress usage.
+    const injectStreamOptions = !!body.stream && !isAnthropic && !isCloudflareSync();
 
     // Transform request body if needed (use resolved model name)
     // For Responses API: pass body directly (no Anthropic transform — Responses API is OpenAI-only)
@@ -413,24 +454,19 @@ async function tryProviderWithRetries(
       requestBody = isAnthropic ? transformToAnthropic(bodyWithResolvedModel as ChatCompletionRequest) : bodyWithResolvedModel;
     }
 
-    // Raw-forward eligibility: only when the outgoing body is provably
-    // semantically identical to the original request text, so forwarding the
-    // raw bytes is equivalent to re-serializing requestBody. The body is
-    // rewritten (→ cannot raw-forward) only when:
-    //   - the upstream model differs from the requested one (alias/mapping/fallback), or
-    //   - stream_options were injected (chat, non-anthropic, non-CF), or
-    //   - the chat→anthropic transform was applied (transformToAnthropic), or
-    //   - the anthropic→OpenAI transform was applied (anthropicMessages to a
-    //     non-anthropic provider — transformAnthropicToOpenAI rewrites the body).
-    // The anthropicMessages-to-anthropic and responses paths only swap the
-    // model, so an unchanged model there means the raw text is safe to forward
-    // as-is — this is what keeps large Claude Code requests under CF's CPU budget.
-    const bodyRewritten =
-      resolvedModel !== body.model ||
-      injectStreamOptions ||
-      (apiType === 'chat' && isAnthropic) ||
-      (apiType === 'anthropicMessages' && !isAnthropic);
-    const rawPayload = rawBody && !bodyRewritten ? rawBody : undefined;
+    // Raw-forward eligibility: only forward the original request text when the
+    // outgoing body is provably semantically identical to it (see
+    // isRawForwardEligible). Otherwise re-serialize requestBody.
+    const rawPayload =
+      rawBody &&
+      isRawForwardEligible({
+        apiType,
+        isAnthropicProvider: isAnthropic,
+        modelChanged: resolvedModel !== body.model,
+        injectStreamOptions,
+      })
+        ? rawBody
+        : undefined;
 
     const startTime = Date.now();
     let url: string;

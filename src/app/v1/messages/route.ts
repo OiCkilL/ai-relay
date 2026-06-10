@@ -12,7 +12,7 @@ import { createUsageEvent, getBatchRecorder } from '@/lib/usage';
 import { createUsageStorage } from '@/lib/usage/factory';
 import { recordRequestLog } from '@/lib/observability/request-logs';
 import { chunkHasUsage, jsonStringFieldLength, createByteCountingStream, estimateCompletionTokensFromStreamBytes } from '@/lib/usage/stream-usage';
-import { isCloudflareSync } from '@/lib/cf-env';
+import { isCloudflareSync, runAfterResponse } from '@/lib/cf-env';
 import type { AnthropicMessagesRequest } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -553,7 +553,9 @@ export async function POST(request: NextRequest) {
       // forwarded unchanged. For non-anthropic providers the OpenAI→Anthropic
       // stream translation below is mandatory, so CF must fall through to it.
       if (isCloudflareSync() && isAnthropic) {
-        const cfBody = createByteCountingStream(response.body, async (totalBytes) => {
+        const cfBody = createByteCountingStream(response.body, (totalBytes) => {
+          // Schedule usage recording in the background so slow D1/log writes
+          // don't delay the client's stream close. See runAfterResponse.
           const completionTokens = estimateCompletionTokensFromStreamBytes(totalBytes);
           const recordLatencyMs = Date.now() - startTime;
           const event = createUsageEvent({
@@ -566,20 +568,22 @@ export async function POST(request: NextRequest) {
             latencyMs: recordLatencyMs,
             isStream: true,
           });
-          await batchRecorder.record(event);
-          await recordRequestLog({
-            traceId,
-            timestamp: new Date().toISOString(),
-            apiKeyHash: apiKey.hash,
-            model: body.model,
-            provider: provider.name,
-            status: 'success',
-            httpStatus: 200,
-            latencyMs: recordLatencyMs,
-            promptTokens: estimatedPromptTokens,
-            completionTokens,
-            totalTokens: estimatedPromptTokens + completionTokens,
-            isStream: true,
+          runAfterResponse(async () => {
+            await batchRecorder.record(event);
+            await recordRequestLog({
+              traceId,
+              timestamp: new Date().toISOString(),
+              apiKeyHash: apiKey.hash,
+              model: body.model,
+              provider: provider.name,
+              status: 'success',
+              httpStatus: 200,
+              latencyMs: recordLatencyMs,
+              promptTokens: estimatedPromptTokens,
+              completionTokens,
+              totalTokens: estimatedPromptTokens + completionTokens,
+              isStream: true,
+            });
           });
         });
         return new Response(cfBody, {
